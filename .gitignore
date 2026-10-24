@@ -1,0 +1,18 @@
+node_modules/
+dist/
+*.local
+.env
+.env.*
+!.env.example
+coverage/
+*.tsbuildinfo
+__pycache__/
+*.py[cod]
+
+# Dados de importação, backups e artefatos locais (permanecem neste computador).
+/base-exemplo/
+/.aws/
+/.codex/
+/.agents/
+*.log
+.DS_Store
