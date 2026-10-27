@@ -1,5 +1,5 @@
 import { UNIDADE_CABO, UNIDADE_MAO_OBRA, UNIDADE_MATERIAL } from '../dominio/constantes';
-import type { Catalogos, LinhaResultado, PontoMedicao, ResultadoMedicao, ResultadoPorPonto } from '../dominio/tipos';
+import type { Catalogos, LinhaResultado, PontoMedicao, PranchaPdf, ResultadoMedicao, ResultadoPorPonto } from '../dominio/tipos';
 
 function positiva(valor: number) {
   if (!Number.isFinite(valor) || valor <= 0) throw new Error('Quantidade deve ser positiva e finita.');
@@ -22,7 +22,7 @@ function consolidar(linhas: LinhaResultado[]): LinhaResultado[] {
  * R gera apenas mão de obra. Materiais presentes em R continuam elegíveis como gatilhos.
  * Contexto corresponde a qualquer categoria selecionada. Somente validados são medidos.
  */
-export function calcularMedicao({ materiais, maoObra, estruturas, regras, pontos }: Catalogos & { pontos: PontoMedicao[] }): ResultadoMedicao {
+export function calcularMedicao({ materiais, maoObra, estruturas, regras, pontos, pranchas = [] }: Catalogos & { pontos: PontoMedicao[]; pranchas?: Pick<PranchaPdf, 'id' | 'nome'>[] }): ResultadoMedicao {
   const resultado: ResultadoMedicao = { metragemLinearTotal: 0, materiaisInstalacao: [], materiaisDesativacao: [], maoObraInstalacao: [], maoObraDesativacao: [], maoObraReinstalacao: [], porPonto: [] };
   for (const ponto of pontos.filter(p => p.status === 'validado')) {
     if (!Number.isFinite(ponto.metragem_linear) || ponto.metragem_linear < 0) throw new Error('Metragem linear deve ser finita e não negativa.');
@@ -46,6 +46,7 @@ export function calcularMedicao({ materiais, maoObra, estruturas, regras, pontos
       if (cabo.categoria !== 'cabo') throw new Error(`O material ${cabo.codigo} não pertence à categoria cabo.`);
       adicionarMaterial(id, ponto.metragem_linear);
     }
+    for (const item of ponto.materiais_adicionais ?? []) adicionarMaterial(item.material_id, item.quantidade);
     const materialIds = new Set(materiaisPonto.map(m => m.material_id));
     const categorias = new Set(materiais.filter(m => materialIds.has(m.id)).map(m => m.categoria));
     const itens: ResultadoPorPonto['itens'] = ponto.operacao === 'R' ? [] : materiaisPonto.map(({ material_id: _id, ...item }) => ({ ...item, tipo: 'material' }));
@@ -79,7 +80,8 @@ export function calcularMedicao({ materiais, maoObra, estruturas, regras, pontos
     if (ponto.operacao === 'D') { resultado.materiaisDesativacao.push(...materiaisGerados); resultado.maoObraDesativacao.push(...servicosGerados); }
     if (ponto.operacao === 'R') resultado.maoObraReinstalacao.push(...servicosGerados);
     resultado.metragemLinearTotal = arredondar(resultado.metragemLinearTotal + ponto.metragem_linear);
-    resultado.porPonto.push({ numeroPonto: ponto.numero, pagina: ponto.pagina, operacao: ponto.operacao, estrutura: nomes.join(', ') || null, metragemLinear: ponto.metragem_linear, itens });
+    const indicePrancha = pranchas.findIndex(p => p.id === ponto.prancha_id);
+    resultado.porPonto.push({ ...(indicePrancha >= 0 ? { prancha: `${indicePrancha + 1} · ${pranchas[indicePrancha].nome}`, pranchaId: ponto.prancha_id } : {}), numeroPonto: ponto.numero, pagina: ponto.pagina, operacao: ponto.operacao, estrutura: nomes.join(', ') || null, metragemLinear: ponto.metragem_linear, itens });
   }
   resultado.materiaisInstalacao = consolidar(resultado.materiaisInstalacao);
   resultado.materiaisDesativacao = consolidar(resultado.materiaisDesativacao);

@@ -50,3 +50,12 @@ it('leva a soma de metros e serviços manuais ao consolidado e ao detalhamento',
   expect(linhas.filter(l => l.Tipo === 'Material').map(l => [l.Ponto, l.Quantidade, l.Unidade])).toEqual([['P01', 12.5, 'm'], ['P02', 7.25, 'm']]);
   expect(linhas.filter(l => l.Tipo === 'Mão de Obra')).toHaveLength(2);
 });
+
+it('exporta a origem das pranchas sem misturar as páginas de PDFs diferentes', () => {
+  const ponto: PontoMedicao = { id: 'a', numero: 'P01', pagina: 1, x_percent: .5, y_percent: .5, status: 'validado', operacao: 'I', estrutura_id: null, estruturas_secundarias: [], poste_id: null, cabos_ids: [], metragem_linear: 0, mao_obra_adicional: [], materiais_adicionais: [{ material_id: 'm', quantidade: 2 }] };
+  const resultado = calcularMedicao({ materiais: [{ id: 'm', codigo: '001', descricao: 'Material', categoria: 'geral' }], maoObra: [], estruturas: [], regras: [], pranchas: [{ id: 'pdf-a', nome: 'A.pdf' }, { id: 'pdf-b', nome: 'B.pdf' }], pontos: [{ ...ponto, prancha_id: 'pdf-a' }, { ...ponto, id: 'b', numero: 'P02', prancha_id: 'pdf-b' }] });
+  const livro = XLSX.read(XLSX.write(criarExcel(resultado), { type: 'array', bookType: 'xlsx' }));
+  const linhas = XLSX.utils.sheet_to_json<Record<string, unknown>>(livro.Sheets['Por Ponto']);
+  expect(linhas.map(l => [l.Prancha, l.Página, l.Quantidade])).toEqual([['1 · A.pdf', 1, 2], ['2 · B.pdf', 1, 2]]);
+  expect(livro.Sheets['Materiais Instalação'].D2.v).toBe(4);
+});

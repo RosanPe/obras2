@@ -114,3 +114,12 @@ fieldset legend{font-size:13px;font-weight:500}
 @media(max-width:767px){.app-navigation{flex-wrap:wrap}.app-navigation .tabs{flex-basis:100%;order:2}.app-nav-actions{margin-left:auto}.nav-user-email{max-width:calc(100vw - 125px)}.table-scroll,.audit-list{max-height:50dvh}}
 
 .audit-json{max-width:520px;max-height:260px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;padding:10px;background:#f5f8f6;border-radius:6px}.dark .audit-json{background:#20382b}
+
+.pdf-files-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0}
+.prancha-picker{display:flex;flex-direction:row;align-items:center;gap:8px;font-size:12px;min-width:0}.prancha-picker select{max-width:270px;width:auto;min-width:120px;padding:7px;font-size:12px}
+.page-navigation{display:flex;align-items:center;gap:2px;flex-shrink:0;border-left:1px solid #dce5df;padding-left:8px}.page-navigation .page-label{margin-left:0}
+.mode-toolbar{flex-wrap:wrap}.mode-toolbar>span{flex:1;min-width:220px}
+.dark .page-navigation{border-color:#304739}
+@media(max-width:767px){.pdf-files-controls{width:100%}.prancha-picker{flex:1}.prancha-picker select{width:100%;max-width:210px;min-width:0}.mode-toolbar{gap:8px}.mode-toolbar>span{flex-basis:100%}.page-navigation{border-left:0;padding-left:0}.mode-buttons{flex-wrap:wrap}}
+@media(max-width:767px){.viewer .toolbar>.pdf-files-controls>button{width:auto}.pdf-files-controls>.prancha-picker{order:2;flex-basis:100%}.prancha-picker select{flex:1;max-width:none}}
+@media(max-width:767px){.viewer .toolbar>.pdf-files-controls>button[aria-label]{min-width:40px;width:40px}}

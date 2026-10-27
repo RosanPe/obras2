@@ -36,7 +36,7 @@ O documento `inicio.md` permanece como especificação completa. Esta etapa avan
 
 ## Validação
 
-- 64 testes Vitest locais (61 no CI e 3 opcionais da base importada) e 6 testes do conversor Python do motor, Excel, geometria, busca por nomenclaturas, formulário do ponto, migração local e validação de catálogos.
+- 80 testes Vitest locais (77 no CI e 3 opcionais da base importada) e 6 testes do conversor Python do motor, Excel, geometria, busca por nomenclaturas, formulário do ponto, migração local e validação de catálogos.
 - Brave headless no Ubuntu, em perfil isolado: PDF de duas páginas, upload, criação/reedição/arraste de pontos, zoom, pan, área expandida e restauração após reload.
 - Buscas N/11200/alum 2/0 ca, adicionar/remover estruturas, seleção por teclado e serviços manuais com quantidades.
 - Login real pela interface e criação de cabo sem subtipo no Supabase pelo editor de materiais.
@@ -94,3 +94,17 @@ Detecção automática de círculos e relatório PDF permanecem opcionais de fas
 - Build de publicação valida URL/chave pública do Supabase e resolve base pelo nome do repositório; raiz e domínio próprio suportados.
 - Dados locais, base importada, backups e credenciais ignorados pelo Git. Guia em GITHUB-PAGES.md.
 - Sem remoto, push ou publicação nesta preparação.
+
+
+## Várias pranchas e materiais avulsos — 26/10/2026
+
+- Ícone SVG próprio da aba, com caminho compatível com GitHub Pages.
+- Múltiplos PDFs locais, seleção de arquivo, página ativa persistida e navegação ao lado dos modos de interação.
+- Pontos vinculados por ID de prancha e página; numeração única em toda a obra. Resumo/Excel consolidados de todas as pranchas, com origem no detalhamento.
+- Materiais avulsos no final do formulário, busca, quantidade e remoção; soma às estruturas e gatilhos automáticos de mão de obra.
+- Migração do PDF único preservando os pontos existentes; exclusão confirmada de uma prancha preserva as demais.
+- Persistência serializada e adição de PDFs revertida em falha de espaço. Sem alterações no Supabase.
+
+- Navegador isolado validou lote múltiplo, exclusão parcial, migração do PDF único, restauração e totais de materiais/mão de obra em todos os PDFs/páginas, além do layout desktop/mobile sem overflow ou erros JavaScript.
+
+- Botão Nova medição, com confirmação e reset persistido de todos os PDFs/pontos/resumo; falha de escrita preserva o trabalho anterior. Título da aba Obras - Medicao e novo favicon de régua/energia.

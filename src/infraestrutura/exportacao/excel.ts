@@ -4,9 +4,9 @@ import { ABAS_RESULTADO } from '../../dominio/constantes';
 import { obterResumoObra } from '../../aplicacao/resumo-obra';
 import type { ResultadoMedicao, ResultadoPorPonto } from '../../dominio/tipos';
 export function linhasPorPonto(pontos: ResultadoPorPonto[]) {
-  return pontos.flatMap(p => p.itens.map((item, indice) => ({ Ponto: p.numeroPonto, Página: p.pagina, Operação: p.operacao, Estrutura: p.estrutura ?? '—', Tipo: item.tipo === 'material' ? 'Material' : 'Mão de Obra', Código: item.codigo, Descrição: item.descricao, Unidade: item.unidade, Quantidade: item.quantidade, 'Metragem linear (m)': indice === 0 ? p.metragemLinear : undefined })));
+  return pontos.flatMap(p => p.itens.map((item, indice) => ({ Ponto: p.numeroPonto, Página: p.pagina, Operação: p.operacao, Estrutura: p.estrutura ?? '—', Tipo: item.tipo === 'material' ? 'Material' : 'Mão de Obra', Código: item.codigo, Descrição: item.descricao, Unidade: item.unidade, Quantidade: item.quantidade, 'Metragem linear (m)': indice === 0 ? p.metragemLinear : undefined, Prancha: p.prancha ?? 'PDF original' })));
 }
-const COLUNAS_PONTO = ['Ponto', 'Página', 'Operação', 'Estrutura', 'Tipo', 'Código', 'Descrição', 'Unidade', 'Quantidade', 'Metragem linear (m)'];
+const COLUNAS_PONTO = ['Ponto', 'Página', 'Operação', 'Estrutura', 'Tipo', 'Código', 'Descrição', 'Unidade', 'Quantidade', 'Metragem linear (m)', 'Prancha'];
 function adicionarPontos(livro: XLSX.WorkBook, pontos: ResultadoPorPonto[]) {
   adicionarAba(livro, 'Por Ponto', linhasPorPonto(pontos), COLUNAS_PONTO);
   const aba = livro.Sheets['Por Ponto'];

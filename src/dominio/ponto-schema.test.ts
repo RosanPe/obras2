@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { pontoFormularioSchema, pontoValidadoSchema } from './ponto-schema';
-const vazio = { numero: 'P01', operacao: 'I', estruturas: [], poste_id: null, cabos_ids: [], metragem_linear: 0, mao_obra_adicional: [] };
+const vazio = { numero: 'P01', operacao: 'I', estruturas: [], poste_id: null, cabos_ids: [], metragem_linear: 0, materiais_adicionais: [], mao_obra_adicional: [] };
 describe('formulário do ponto', () => {
   it('permite salvar rascunho sem itens, mas exige conteúdo para validar', () => {
     expect(pontoFormularioSchema.safeParse(vazio).success).toBe(true);
@@ -14,6 +14,10 @@ describe('formulário do ponto', () => {
   it('permite vários serviços manuais e estruturas no mesmo ponto', () => {
     expect(pontoValidadoSchema.safeParse({ ...vazio, estruturas: ['N1', 'N4'], mao_obra_adicional: [{ mao_obra_id: 'mo1', quantidade: 1 }, { mao_obra_id: 'mo2', quantidade: 3 }] }).success).toBe(true);
     expect(pontoValidadoSchema.safeParse({ ...vazio, mao_obra_adicional: [{ mao_obra_id: 'mo1', quantidade: .5 }] }).success).toBe(true);
+  });
+  it('valida ponto só com material avulso e exige quantidades positivas', () => {
+    expect(pontoValidadoSchema.safeParse({ ...vazio, materiais_adicionais: [{ material_id: 'm1', quantidade: 2.5 }] }).success).toBe(true);
+    for (const quantidade of [0, -1, NaN]) expect(pontoValidadoSchema.safeParse({ ...vazio, materiais_adicionais: [{ material_id: 'm1', quantidade }] }).success).toBe(false);
   });
   it('rejeita negativos, NaN e quantidade zero de serviço', () => {
     expect(pontoFormularioSchema.safeParse({ ...vazio, metragem_linear: -1 }).success).toBe(false);

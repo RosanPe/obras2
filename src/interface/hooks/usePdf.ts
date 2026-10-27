@@ -7,33 +7,36 @@ export async function validarPdf(pdf: Blob) {
   try { await tarefa.promise; } finally { await tarefa.destroy(); }
 }
 export function usePdf(pdf: Blob | null, pagina: number, zoom: number, canvas: RefObject<HTMLCanvasElement>) {
-  const [documento, setDocumento] = useState<PDFDocumentProxy | null>(null);
-  const [folha, setFolha] = useState<PDFPageProxy | null>(null);
+  const [origemDocumento, setDocumento] = useState<{ pdf: Blob; doc: PDFDocumentProxy } | null>(null);
+  const documento = origemDocumento?.pdf === pdf ? origemDocumento.doc : null;
+  const [origemFolha, setFolha] = useState<{ doc: PDFDocumentProxy; pagina: number; folha: PDFPageProxy } | null>(null);
+  const folha = origemFolha?.doc === documento && origemFolha?.pagina === pagina ? origemFolha.folha : null;
   const [tamanho, setTamanho] = useState({ width: 0, height: 0 });
   const [renderizando, setRenderizando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [paginaPronta, setPaginaPronta] = useState(false);
+  const [renderPronto, setPaginaPronta] = useState<{ pdf: Blob | null; pagina: number } | null>(null);
+  const paginaPronta = renderPronto?.pdf === pdf && renderPronto?.pagina === pagina;
   useEffect(() => {
     let ativo = true; let tarefa: ReturnType<typeof getDocument> | undefined;
-    setDocumento(null); setFolha(null); setPaginaPronta(false); setErro(null);
+    setDocumento(null); setFolha(null); setPaginaPronta(null); setErro(null);
     if (!pdf) return;
     setRenderizando(true);
     void pdf.arrayBuffer().then(data => {
       if (!ativo) return;
       tarefa = getDocument({ data });
-      return tarefa.promise.then(doc => { if (ativo) setDocumento(doc); });
+      return tarefa.promise.then(doc => { if (ativo) setDocumento({ pdf, doc }); });
     }).catch(() => { if (ativo) { setErro('Não foi possível abrir o PDF. Verifique se está válido e sem senha.'); setRenderizando(false); } });
     return () => { ativo = false; void tarefa?.destroy(); };
   }, [pdf]);
   useEffect(() => {
     let ativo = true;
-    setFolha(null); setPaginaPronta(false);
+    setFolha(null); setPaginaPronta(null);
     if (!documento) return;
     setRenderizando(true);
     void documento.getPage(Math.min(pagina, documento.numPages)).then(page => {
       if (!ativo) return;
       const viewport = page.getViewport({ scale: 1 });
-      setTamanho({ width: viewport.width, height: viewport.height }); setFolha(page);
+      setTamanho({ width: viewport.width, height: viewport.height }); setFolha({ doc: documento, pagina, folha: page });
     }).catch(() => { if (ativo) { setErro('Falha ao carregar a página.'); setRenderizando(false); } });
     return () => { ativo = false; };
   }, [documento, pagina]);
@@ -54,12 +57,12 @@ export function usePdf(pdf: Blob | null, pagina: number, zoom: number, canvas: R
         const destino = canvas.current;
         destino.width = buffer.width; destino.height = buffer.height;
         destino.getContext('2d')!.drawImage(buffer, 0, 0);
-        setErro(null); setPaginaPronta(true); setRenderizando(false);
+        setErro(null); setPaginaPronta({ pdf, pagina }); setRenderizando(false);
       }).catch((falha: unknown) => {
         if (ativo && !(falha instanceof Error && falha.name === 'RenderingCancelledException')) { setErro('Falha ao renderizar a página.'); setRenderizando(false); }
       }).finally(() => { buffer.width = 0; buffer.height = 0; });
     }, 180);
     return () => { ativo = false; clearTimeout(timer); tarefa?.cancel(); };
-  }, [folha, zoom, canvas]);
+  }, [folha, zoom, canvas, pdf, pagina]);
   return { documento, tamanho, renderizando, erro, paginaPronta };
 }

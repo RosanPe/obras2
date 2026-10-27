@@ -107,6 +107,29 @@ describe('motor de regras', () => {
     expect(resultado.porPonto[0].itens).toHaveLength(1);
   });
   it('não ignora serviço adicional removido do catálogo', () => expect(() => calcular([{ ...ponto, mao_obra_adicional: [{ mao_obra_id: 'ausente', quantidade: 2 }] }])).toThrow('Mão de obra não encontrada'));
+  it('soma materiais avulsos à estrutura e usa os itens como gatilho de mão de obra', () => {
+    const resultado = calcular([{ ...ponto, materiais_adicionais: [{ material_id: 'm1', quantidade: 4 }] }]);
+    expect(resultado.materiaisInstalacao[0].quantidade).toBe(6);
+    expect(resultado.maoObraInstalacao[0].quantidade).toBe(3);
+    expect(resultado.porPonto[0].itens.filter(i => i.tipo === 'material').map(i => i.quantidade)).toEqual([2, 4]);
+  });
+  it('mede material avulso em desativação e somente sua mão de obra em reinstalação', () => {
+    const resultado = calcular((['D', 'R'] as const).map((operacao, i) => ({ ...ponto, id: String(i), estrutura_id: null, operacao, materiais_adicionais: [{ material_id: 'm1', quantidade: 2 }] })));
+    expect(resultado.materiaisDesativacao[0].quantidade).toBe(2);
+    expect(resultado.maoObraReinstalacao[0].quantidade).toBe(3);
+    expect(resultado.porPonto[1].itens.every(i => i.tipo === 'mao_obra')).toBe(true);
+  });
+  it('consolida todas as pranchas e páginas preservando a origem no detalhamento', () => {
+    const pontos = ['a', 'b'].flatMap((prancha_id, i) => [1, 2].map(pagina => ({ ...ponto, id: `${i}-${pagina}`, numero: `P${i}-${pagina}`, prancha_id, pagina, materiais_adicionais: [{ material_id: 'm1', quantidade: 1 }] })));
+    const resultado = calcularMedicao({ ...catalogos, pontos, pranchas: [{ id: 'a', nome: 'projeto.pdf' }, { id: 'b', nome: 'projeto.pdf' }] });
+    expect(resultado.materiaisInstalacao[0].quantidade).toBe(12);
+    expect(resultado.maoObraInstalacao[0].quantidade).toBe(12);
+    expect(resultado.porPonto.map(p => [p.prancha, p.pagina])).toEqual([['1 · projeto.pdf', 1], ['1 · projeto.pdf', 2], ['2 · projeto.pdf', 1], ['2 · projeto.pdf', 2]]);
+  });
+  it('rejeita material avulso ausente e quantidade inválida', () => {
+    expect(() => calcular([{ ...ponto, materiais_adicionais: [{ material_id: 'ausente', quantidade: 1 }] }])).toThrow('Material não encontrado');
+    expect(() => calcular([{ ...ponto, materiais_adicionais: [{ material_id: 'm1', quantidade: 0 }] }])).toThrow('Quantidade');
+  });
   it('rejeita metragens e quantidades de serviço inválidas', () => {
     expect(() => calcular([{ ...ponto, cabos_ids: ['m2'], metragem_linear: 0 }])).toThrow('Quantidade');
     expect(() => calcular([{ ...ponto, mao_obra_adicional: [{ mao_obra_id: 'mo1', quantidade: -1 }] }])).toThrow('Quantidade');

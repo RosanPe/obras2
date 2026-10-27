@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="fundo" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#189a7b"/><stop offset="1" stop-color="#07513f"/>
+    </linearGradient>
+    <linearGradient id="energia" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#ffe29a"/><stop offset="1" stop-color="#f9b735"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#fundo)"/>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="14.5" fill="none" stroke="#fff" stroke-opacity=".15"/>
+  <path d="M16 18h13m-13 0v28h32V33" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M24 46v-6m8 6v-4m8 4v-6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="m38 11-13 23h11l-4 16 18-26H38l5-13Z" fill="#053c30" opacity=".2" transform="translate(1 2)"/>
+  <path d="m38 10-13 23h11l-4 16 18-26H38l5-13Z" fill="url(#energia)" stroke="#fff0c2" stroke-width="1" stroke-linejoin="round"/>
+</svg>
