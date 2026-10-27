@@ -146,3 +146,14 @@ A migração [administracao_super.sql](supabase/migrations/20261024_administraca
 A auditoria reúne todos os registros atuais dos quatro catálogos, composição incluída, além das contas e permissões. O histórico registra criações, edições, exclusões e mudanças de permissão a partir da ativação, com autor, data e dados anteriores/novos. Não há histórico retroativo. PDFs e pontos continuam locais e não são centralizados nesta página. As três listas do resumo e as respectivas abas do Excel começam em ordem alfabética pela descrição.
 
 O teste [administracao.sql](supabase/tests/administracao.sql), executado como postgres em transação revertida, valida acesso super, delegação, revogação, bloqueio de usuários comuns e registro das alterações. Nenhum usuário ou material de teste é mantido.
+
+
+### Link de redefinição de senha
+
+Em **Auditoria → Usuários e permissões**, o administrador super pode clicar em **Redefinir senha** na linha de uma conta e confirmar o destinatário. A aplicação consulta novamente a RPC protegida `admin_listar_usuarios` e usa o e-mail real do registro para solicitar um link ao Supabase Auth. A solicitação não altera a senha nem a sessão do administrador. Usuários comuns não veem essa área.
+
+O usuário abre o e-mail e define sua própria senha na tela **Definir nova senha**, com pelo menos oito caracteres e confirmação. O app trata `PASSWORD_RECOVERY`, mantém a tela após recarregar sua rota `#/redefinir-senha` e mostra erro quando o link é inválido/expirado. Senhas não são guardadas no estado da medição ou enviadas aos catálogos.
+
+Em **Supabase → Authentication → URL Configuration**, a raiz real da aplicação deve estar autorizada em **Redirect URLs**, por exemplo `https://rosanpe.github.io/obras2/`, e configurada como **Site URL**. O código usa automaticamente a origem e o caminho base da página onde o administrador está. Para enviar de localhost, autorize a URL local; para links destinados a usuários do site publicado, use o botão no site publicado. Não é necessária uma chave service_role. A entrega é feita pelo serviço de e-mail configurado no Supabase.
+
+Referências oficiais: [resetPasswordForEmail](https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail), [URLs de redirecionamento](https://supabase.com/docs/guides/auth/redirect-urls).

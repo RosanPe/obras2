@@ -36,7 +36,7 @@ O documento `inicio.md` permanece como especificação completa. Esta etapa avan
 
 ## Validação
 
-- 80 testes Vitest locais (77 no CI e 3 opcionais da base importada) e 6 testes do conversor Python do motor, Excel, geometria, busca por nomenclaturas, formulário do ponto, migração local e validação de catálogos.
+- 88 testes Vitest locais (85 no CI e 3 opcionais da base importada) e 6 testes do conversor Python do motor, Excel, geometria, busca por nomenclaturas, formulário do ponto, migração local e validação de catálogos.
 - Brave headless no Ubuntu, em perfil isolado: PDF de duas páginas, upload, criação/reedição/arraste de pontos, zoom, pan, área expandida e restauração após reload.
 - Buscas N/11200/alum 2/0 ca, adicionar/remover estruturas, seleção por teclado e serviços manuais com quantidades.
 - Login real pela interface e criação de cabo sem subtipo no Supabase pelo editor de materiais.
@@ -108,3 +108,14 @@ Detecção automática de círculos e relatório PDF permanecem opcionais de fas
 - Navegador isolado validou lote múltiplo, exclusão parcial, migração do PDF único, restauração e totais de materiais/mão de obra em todos os PDFs/páginas, além do layout desktop/mobile sem overflow ou erros JavaScript.
 
 - Botão Nova medição, com confirmação e reset persistido de todos os PDFs/pontos/resumo; falha de escrita preserva o trabalho anterior. Título da aba Obras - Medicao e novo favicon de régua/energia.
+
+
+## Recuperação de senha pela auditoria — 26/10/2026
+
+- Botão Redefinir senha por usuário na auditoria exclusiva do master, com confirmação e consulta protegida do destinatário no banco antes do pedido de envio.
+- Solicitação pelo Supabase Auth, sem chave de servidor no navegador e sem trocar a sessão de quem envia.
+- Tela de nova senha, confirmação e tratamento do evento PASSWORD_RECOVERY e de links expirados, compatível com HashRouter e base path do Pages.
+- Testes unitários de controle de acesso, destinatário, envio, evento de recuperação, atualização e validação da senha.
+- Teste de navegador usa API simulada: nenhum e-mail real é enviado nem senha real modificada. A entrega final usa o provedor configurado no Supabase e a URL autorizada do site.
+
+- Navegador validou cancelamento, envio sem troca da sessão master, erro do provedor, recuperação por link, confirmação da senha, retorno sem loop e recusa de link expirado mesmo com sessão anterior.

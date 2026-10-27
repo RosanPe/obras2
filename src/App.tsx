@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { HashRouter, NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HashRouter, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 import { CheckCircle2, ClipboardList, Database, Download, FileText, LogOut, Map, Moon, ShieldCheck, Sun } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { calcularMedicao } from './aplicacao/motor-regras';
@@ -8,12 +8,13 @@ import { ABAS_RESULTADO } from './dominio/constantes';
 import type { PontoMedicao } from './dominio/tipos';
 import { baixarExcel } from './infraestrutura/exportacao/excel';
 import { carregarTema, salvarTema } from './infraestrutura/local/preferencias';
-import { observarSessao, sair } from './infraestrutura/supabase/auth';
+import { observarSessao, sair, retornoDeRecuperacao, erroNoLinkDeAcesso } from './infraestrutura/supabase/auth';
 import { supabaseConfigurado } from './infraestrutura/supabase/cliente';
 import { PDFViewer } from './interface/componentes/croqui/PDFViewer';
 import { JanelaFlutuantePonto } from './interface/componentes/janela-ponto/JanelaFlutuantePonto';
 import { TabelaResumo } from './interface/componentes/resumo/TabelaResumo';
 import { Button } from './interface/componentes/ui/button';
+import { RedefinirSenha } from './interface/paginas/RedefinirSenha';
 import { Login } from './interface/paginas/Login';
 import { Administracao } from './interface/paginas/Administracao';
 import { Cadastros } from './interface/paginas/Cadastros';
@@ -36,6 +37,9 @@ function Resumo() {
 }
 function Aplicacao() {
   const navigate = useNavigate();
+  const localizacao = useLocation();
+  const retornoConsumido = useRef(false);
+  const [erroRecuperacao, setErroRecuperacao] = useState(erroNoLinkDeAcesso);
   const { pontos, pranchas, pronto, erroPersistencia, avisoAtualizacao, guardarResultado } = useMedicaoStore();
   const { catalogos, carregando, super: superUsuario } = useCatalogosStore();
   const [email, setEmail] = useState<string | null>(null);
@@ -44,12 +48,13 @@ function Aplicacao() {
   const [editando, setEditando] = useState<PontoMedicao | null>(null);
   const fechar = useCallback(() => setEditando(null), []);
   useEffect(() => { void useMedicaoStore.getState().restaurar(); }, []);
-  useEffect(() => observarSessao((novoEmail, id) => { setEmail(novoEmail); setSessaoPronta(true); useCatalogosStore.getState().limpar(); if (id) void useCatalogosStore.getState().carregar().catch(erro => toast.error(`Falha ao carregar catálogos: ${String(erro)}`)); }), []);
+  useEffect(() => observarSessao((novoEmail, id, evento) => { setEmail(novoEmail); setSessaoPronta(true); if (evento === 'PASSWORD_RECOVERY' || (!retornoConsumido.current && evento === 'INITIAL_SESSION' && (retornoDeRecuperacao || erroNoLinkDeAcesso))) { retornoConsumido.current = true; setErroRecuperacao(evento !== 'PASSWORD_RECOVERY' && (erroNoLinkDeAcesso || !id)); navigate('/redefinir-senha', { replace: true }); } useCatalogosStore.getState().limpar(); if (id) void useCatalogosStore.getState().carregar().catch(erro => toast.error(`Falha ao carregar catálogos: ${String(erro)}`)); }), [navigate]);
   useEffect(() => { document.documentElement.classList.toggle('dark', escuro); salvarTema(escuro); }, [escuro]);
   const calculo = useMemo(() => { try { return { resultado: calcularMedicao({ ...catalogos, pontos, pranchas }), erro: null }; } catch (erro) { return { resultado: null, erro: erro instanceof Error ? erro.message : 'Falha no cálculo.' }; } }, [catalogos, pontos, pranchas]);
   const validados = pontos.filter(p => p.status === 'validado').length;
   const pendentes = pontos.length - validados;
   if (!sessaoPronta || !pronto) return <div className="empty" role="status">Restaurando sessão e medição local…</div>;
+  if (localizacao.pathname === '/redefinir-senha') return <RedefinirSenha email={erroRecuperacao ? null : email} concluir={() => { setErroRecuperacao(false); navigate('/croqui', { replace: true }); }} />;
   if (supabaseConfigurado && !email) return <Login />;
   const gerar = async () => {
     if (!calculo.resultado) { toast.error(calculo.erro); return; }

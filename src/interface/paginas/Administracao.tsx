@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { Mail } from 'lucide-react';
+import { enviarLinkSenhaUsuario } from '../../infraestrutura/supabase/repositorios/usuarios';
 import { toast } from 'sonner';
 import { definirPermissao, listarHistorico, listarUsuarios, type RegistroAdministrativo, type UsuarioAdministrativo } from '../../infraestrutura/supabase/repositorios/permissoes';
 import { useCatalogosStore } from '../store/useCatalogosStore';
@@ -14,6 +16,7 @@ export function Administracao() {
   const [busca, setBusca] = useState('');
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState<string | null>(null);
+  const [enviandoSenha, setEnviandoSenha] = useState<string | null>(null);
   const [erro, setErro] = useState('');
   const [revisao, setRevisao] = useState(0);
   useEffect(() => {
@@ -29,6 +32,13 @@ export function Administracao() {
     try { await definirPermissao(usuario.user_id, !usuario.pode_editar); setRevisao(v => v + 1); toast.success(usuario.pode_editar ? 'Permissão revogada.' : 'Permissão concedida.'); }
     catch (e) { toast.error(mensagem(e)); } finally { setSalvando(null); }
   };
+  const enviarSenha = async (usuario: UsuarioAdministrativo) => {
+    if (!usuario.email || !window.confirm(`Enviar um link para ${usuario.email} definir uma nova senha?`)) return;
+    setEnviandoSenha(usuario.user_id);
+    try { await enviarLinkSenhaUsuario(usuario.user_id); toast.success(`Link de redefinição solicitado para ${usuario.email}. Confira a caixa de entrada e o spam.`); }
+    catch (e) { toast.error(`Não foi possível enviar o link: ${mensagem(e)}`); }
+    finally { setEnviandoSenha(null); }
+  };
   const registros = [
     ...catalogos.materiais.map(v => ({ tipo: 'Material', id: v.id, codigo: v.codigo, descricao: v.descricao, dados: v })),
     ...catalogos.maoObra.map(v => ({ tipo: 'Mão de obra', id: v.id, codigo: v.codigo, descricao: v.descricao, dados: v })),
@@ -40,7 +50,7 @@ export function Administracao() {
     <input aria-label="Buscar na auditoria" value={busca} onChange={e => { setBusca(e.target.value); setPagina(0); }} placeholder={aba === 'usuarios' ? 'Buscar e-mail…' : aba === 'historico' ? 'Filtrar pelo nome da tabela…' : 'Buscar código, descrição ou ID…'} />
     {erro && <p className="error" role="alert">{erro}</p>}
     {carregando && <p className="muted" role="status">Carregando…</p>}
-    {!erro && aba === 'usuarios' && <div className="table-scroll"><table><thead><tr><th>Usuário</th><th>Último acesso</th><th>Acesso aos cadastros</th><th>Ação</th></tr></thead><tbody>{usuarios.filter(u => (u.email ?? '').toLowerCase().includes(busca.toLowerCase())).map(u => <tr key={u.user_id}><td>{u.email ?? u.user_id}{u.super && <span className="badge validado ml-2">Super</span>}</td><td>{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : 'Ainda não acessou'}</td><td>{u.pode_editar ? 'Pode cadastrar, editar e excluir' : 'Somente consulta e medição'}</td><td>{u.super ? 'Acesso total' : <Button size="sm" variant="outline" disabled={!!salvando || carregando} aria-label={`${u.pode_editar ? 'Revogar' : 'Permitir'} cadastros para ${u.email}`} onClick={() => void alterar(u)}>{salvando === u.user_id ? 'Salvando…' : u.pode_editar ? 'Revogar cadastros' : 'Permitir cadastros'}</Button>}</td></tr>)}</tbody></table></div>}
+    {!erro && aba === 'usuarios' && <div className="table-scroll"><table><thead><tr><th>Usuário</th><th>Último acesso</th><th>Acesso aos cadastros</th><th>Ação</th></tr></thead><tbody>{usuarios.filter(u => (u.email ?? '').toLowerCase().includes(busca.toLowerCase())).map(u => <tr key={u.user_id}><td>{u.email ?? u.user_id}{u.super && <span className="badge validado ml-2">Super</span>}</td><td>{u.ultimo_acesso ? new Date(u.ultimo_acesso).toLocaleString('pt-BR') : 'Ainda não acessou'}</td><td>{u.pode_editar ? 'Pode cadastrar, editar e excluir' : 'Somente consulta e medição'}</td><td><div className="flex gap-2 flex-wrap items-center">{u.super ? 'Acesso total' : <Button size="sm" variant="outline" disabled={!!salvando || !!enviandoSenha || carregando} aria-label={`${u.pode_editar ? 'Revogar' : 'Permitir'} cadastros para ${u.email}`} onClick={() => void alterar(u)}>{salvando === u.user_id ? 'Salvando…' : u.pode_editar ? 'Revogar cadastros' : 'Permitir cadastros'}</Button>}<Button size="sm" variant="outline" disabled={!u.email || !!enviandoSenha || !!salvando || carregando} aria-label={`Enviar link para redefinir senha de ${u.email}`} onClick={() => void enviarSenha(u)}><Mail size={15} />{enviandoSenha === u.user_id ? 'Enviando…' : 'Redefinir senha'}</Button></div></td></tr>)}</tbody></table></div>}
     {!erro && aba === 'registros' && <><p className="muted mt-3">{registros.length} registros · dados atuais do catálogo compartilhado</p><div className="table-scroll"><table><thead><tr><th>Tipo</th><th>Código</th><th>Descrição</th><th>Registro completo</th></tr></thead><tbody>{registros.map(r => <tr key={`${r.tipo}-${r.id}`}><td>{r.tipo}</td><td>{r.codigo || '—'}</td><td>{r.descricao}</td><td><details><summary>Ver dados</summary><pre className="audit-json">{JSON.stringify(r.dados, null, 2)}</pre></details></td></tr>)}</tbody></table></div></>}
     {!erro && aba === 'historico' && <><p className="notice mt-3">As alterações são registradas a partir da ativação desta auditoria. PDF e pontos permanecem no navegador de cada usuário.</p><div className="table-scroll"><table><thead><tr><th>Data</th><th>Usuário</th><th>Tabela</th><th>Ação</th><th>Dados</th></tr></thead><tbody>{historico.map(r => <tr key={r.id}><td>{new Date(r.ocorrido_em).toLocaleString('pt-BR')}</td><td>{r.usuario_email ?? 'Sistema'}</td><td>{r.tabela}</td><td>{{ INSERT: 'Criação', UPDATE: 'Edição', DELETE: 'Exclusão' }[r.acao] ?? r.acao}</td><td><details><summary>Ver alteração</summary><pre className="audit-json">{JSON.stringify({ antes: r.antes, depois: r.depois }, null, 2)}</pre></details></td></tr>)}</tbody></table></div>{!historico.length && !carregando && <p className="muted p-6">Nenhuma alteração registrada.</p>}<div className="flex items-center gap-3 mt-3"><Button size="sm" variant="outline" disabled={pagina === 0 || carregando} onClick={() => setPagina(p => p - 1)}>Anterior</Button><span className="muted">Página {pagina + 1} · {total} alterações</span><Button size="sm" variant="outline" disabled={(pagina + 1) * 50 >= total || carregando} onClick={() => setPagina(p => p + 1)}>Próxima</Button></div></>}
   </section>;
