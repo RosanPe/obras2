@@ -33,7 +33,16 @@ Se usar domínio próprio, configure o domínio em **Settings → Pages** e crie
 
 ## 3. Enviar o código
 
-O Git local já está inicializado, ainda sem commits ou remoto. Na raiz do projeto, substitua `SEU_USUARIO/SEU_REPOSITORIO` pelo destino real:
+Este projeto já usa a branch `main` e o remoto `git@github.com:RosanPe/obras2.git`. Para atualizar o repositório atual, basta revisar, criar um commit e enviar:
+
+```bash
+git status
+git add README.md docs src public index.html
+git commit -m "Atualiza aplicação e documentação"
+git push origin main
+```
+
+Para uma cópia nova em outro repositório vazio, substitua `SEU_USUARIO/SEU_REPOSITORIO` pelo destino real:
 
 ```bash
 git branch -M main
@@ -74,3 +83,8 @@ npm run preview
 O comando `build:pages` lê o `.env.local` no computador e valida a configuração. No GitHub ele usa os secrets/variables. O Node do CI está fixado na linha 22 em `.nvmrc`.
 
 Referências: [deploy do Vite](https://vite.dev/guide/static-deploy#github-pages), [workflow do Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
+
+## Diagnóstico de tela branca
+
+Se o HTML publicado contém `%BASE_URL%` ou `/src/main.tsx`, a raiz do código-fonte foi publicada sem o build do Vite. Confira **Settings → Pages → Source = GitHub Actions** e execute novamente o workflow **Verificar e publicar no GitHub Pages** na `main`. Evite a publicação concorrente da branch pelo fluxo padrão Jekyll. O site precisa usar o artefato `dist/` gerado pelo workflow da aplicação.

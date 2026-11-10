@@ -1,38 +1,33 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Rnd } from 'react-rnd';
-import { useFieldArray, useForm, type FieldPath } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { GripHorizontal, Minus, X } from 'lucide-react';
 import { toast } from 'sonner';
-import type { PontoMedicao } from '../../../dominio/tipos';
-import { pontoFormularioSchema, pontoValidadoSchema, type FormularioPonto } from '../../../dominio/ponto-schema';
-import { OPERACOES } from '../../../dominio/constantes';
+import type { ComposicaoOperacao, Operacao, PontoMedicao } from '../../../dominio/tipos';
+import { pontoComposicaoSchema, pontoComposicaoValidadoSchema } from '../../../dominio/composicao-schema';
+import { atualizarFontes, composicaoVazia, obterOperacoesPonto } from '../../../aplicacao/composicao-ponto';
 import { useCatalogosStore } from '../../store/useCatalogosStore';
 import { useMedicaoStore } from '../../store/useMedicaoStore';
 import { BuscaCatalogo } from '../cadastros/BuscaCatalogo';
 import { Button } from '../ui/button';
 let posicao = { x: 0, y: 0 };
+const NOMES = { I: 'Instalado', D: 'Desativado', R: 'Reinstalado' } as const;
+function Quantidade({ valor, rotulo, alterar, metros = false }: { valor: number; rotulo: string; alterar: (n: number) => void; metros?: boolean }) {
+  const [texto, setTexto] = useState(String(valor));
+  useEffect(() => setTexto(String(valor)), [valor]);
+  return <label className="point-quantity">{metros ? 'Metros' : 'Quantidade'}<input type="number" inputMode="decimal" step="any" min="0.00000001" required value={texto} aria-label={rotulo} onChange={e => { setTexto(e.target.value); const n = e.target.valueAsNumber; if (Number.isFinite(n) && n > 0) alterar(n); }} onBlur={() => { if (!(Number(texto) > 0)) setTexto(String(valor)); }} /></label>;
+}
 export function JanelaFlutuantePonto({ ponto, fechar }: { ponto: PontoMedicao; fechar: () => void }) {
-  const { catalogos } = useCatalogosStore();
+  const { catalogos, carregando } = useCatalogosStore();
   const { salvarPonto, excluirPonto, pontos } = useMedicaoStore();
   const [mobile, setMobile] = useState(window.innerWidth < 768);
   const [minimizada, setMinimizada] = useState(false);
+  const [numero, setNumero] = useState(ponto.numero);
+  const [aba, setAba] = useState<Operacao>('I');
+  const [operacoes, setOperacoes] = useState(() => structuredClone(obterOperacoesPonto({ ...ponto, status: 'pendente' }, catalogos)));
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
   const painel = useRef<HTMLDivElement>(null);
-  const { register, handleSubmit, control, watch, setValue, setError, clearErrors, formState: { errors, isSubmitting } } = useForm<FormularioPonto>({
-    resolver: zodResolver(pontoFormularioSchema), defaultValues: {
-      numero: ponto.numero, operacao: ponto.operacao,
-      estruturas: [...new Set([ponto.estrutura_id, ...ponto.estruturas_secundarias].filter((id): id is string => !!id))],
-      poste_id: ponto.poste_id, cabos_ids: ponto.cabos_ids,
-      metragem_linear: ponto.metragem_linear,
-      mao_obra_adicional: ponto.mao_obra_adicional, materiais_adicionais: ponto.materiais_adicionais ?? [],
-    },
-  });
-  const { fields: servicos, append: adicionarServico, remove: removerServico } = useFieldArray({ control, name: 'mao_obra_adicional' });
-  const { fields: materiais, append: adicionarMaterial, remove: removerMaterial } = useFieldArray({ control, name: 'materiais_adicionais' });
-  const estruturas = watch('estruturas');
-  const cabosSelecionados = watch('cabos_ids');
-  const postes = useMemo(() => catalogos.materiais.filter(m => m.categoria === 'poste'), [catalogos.materiais]);
-  const cabos = useMemo(() => catalogos.materiais.filter(m => m.categoria === 'cabo'), [catalogos.materiais]);
+  const atual = operacoes[aba] ?? composicaoVazia();
   useEffect(() => {
     const anterior = document.activeElement as HTMLElement | null;
     const listener = (e: KeyboardEvent) => { if (e.key === 'Escape' && !e.defaultPrevented) fechar(); };
@@ -41,46 +36,46 @@ export function JanelaFlutuantePonto({ ponto, fechar }: { ponto: PontoMedicao; f
     painel.current?.querySelector('input')?.focus();
     return () => { document.removeEventListener('keydown', listener); window.removeEventListener('resize', resize); anterior?.focus(); };
   }, [fechar]);
-  const salvar = async (dados: FormularioPonto, status: PontoMedicao['status']) => {
-    clearErrors();
-    if (pontos.some(p => p.id !== ponto.id && p.numero.toLocaleLowerCase() === dados.numero.toLocaleLowerCase())) { setError('numero', { message: 'Já existe um ponto com este número.' }, { shouldFocus: true }); return; }
+  const editar = (proxima: ComposicaoOperacao) => setOperacoes(o => ({ ...o, [aba]: proxima }));
+  const fontes = (alteracoes: Partial<Pick<ComposicaoOperacao, 'estruturas' | 'postes' | 'cabos'>>) => {
+    try { editar(atualizarFontes(catalogos, aba, atual, { estruturas: atual.estruturas, postes: atual.postes, cabos: atual.cabos, ...alteracoes })); setErro(''); }
+    catch (e) { editar({ ...atual, ...alteracoes }); setErro(e instanceof Error ? e.message : 'Não foi possível preencher os itens.'); }
+  };
+  const salvar = async (status: PontoMedicao['status']) => {
+    const validacao = (status === 'validado' ? pontoComposicaoValidadoSchema : pontoComposicaoSchema).safeParse({ numero, operacoes });
+    if (!validacao.success) { setErro(validacao.error.issues[0].message); return; }
+    if (pontos.some(p => p.id !== ponto.id && p.numero.toLocaleLowerCase() === validacao.data.numero.toLocaleLowerCase())) { setErro('Já existe um ponto com este número.'); return; }
     if (status === 'validado') {
-      const validacao = pontoValidadoSchema.safeParse(dados);
-      if (!validacao.success) {
-        for (const erro of validacao.error.issues) setError(erro.path.join('.') as FieldPath<FormularioPonto>, { message: erro.message });
-        toast.error(validacao.error.issues[0].message); return;
-      }
-      if (dados.estruturas.some(id => !catalogos.estruturas.some(e => e.id === id)) || (dados.poste_id && !postes.some(m => m.id === dados.poste_id)) || dados.cabos_ids.some(id => !cabos.some(m => m.id === id)) || dados.mao_obra_adicional.some(s => !catalogos.maoObra.some(m => m.id === s.mao_obra_id)) || dados.materiais_adicionais.some(item => !catalogos.materiais.some(m => m.id === item.material_id))) {
-        toast.error('Há itens indisponíveis no catálogo atual. Remova ou substitua antes de validar.'); return;
+      for (const o of Object.values(operacoes)) {
+        if (!o) continue;
+        if (o.materiais.some(i => !catalogos.materiais.some(m => m.id === i.material_id)) || o.mao_obra.some(i => !catalogos.maoObra.some(m => m.id === i.mao_obra_id))) { setErro('Substitua os materiais ou serviços indisponíveis antes de validar.'); return; }
       }
     }
-    const atual = useMedicaoStore.getState().pontos.find(p => p.id === ponto.id) ?? ponto;
-    const { estruturas: selecionadas, ...campos } = dados;
+    setSalvando(true); setErro('');
     try {
-      await salvarPonto({ ...atual, ...campos, estrutura_id: selecionadas[0] ?? null, estruturas_secundarias: selecionadas.slice(1), status });
-      toast.success(status === 'validado' ? 'Ponto validado.' : 'Rascunho salvo.'); fechar();
-    } catch { toast.error('Falha ao salvar no navegador.'); }
+      const salvo = useMedicaoStore.getState().pontos.find(p => p.id === ponto.id) ?? ponto;
+      await salvarPonto({ ...salvo, numero: validacao.data.numero, operacoes: validacao.data.operacoes, status });
+      toast.success(status === 'validado' ? 'Ponto validado em todas as operações preenchidas.' : 'Rascunho salvo.'); fechar();
+    } catch { setErro('Não foi possível salvar o ponto no navegador.'); }
+    finally { setSalvando(false); }
   };
+  const materialNome = (id: string) => { const m = catalogos.materiais.find(m => m.id === id); return m ? `${m.codigo} · ${m.descricao}` : 'Material indisponível'; };
+  const materialCodigo = (id: string) => catalogos.materiais.find(m => m.id === id)?.codigo ?? id;
   const conteudo = <div ref={painel} className="point-dialog" role="dialog" aria-modal="false" aria-labelledby="titulo-ponto"><div className="dialog-handle"><GripHorizontal size={18} /><strong id="titulo-ponto">Ponto {ponto.numero}</strong><span className={`badge ${ponto.status}`}>{ponto.status}</span><Button variant="ghost" size="icon" aria-label={minimizada ? 'Expandir janela' : 'Minimizar janela'} onClick={() => setMinimizada(!minimizada)}><Minus size={16} /></Button><Button variant="ghost" size="icon" aria-label="Fechar janela" onClick={fechar}><X size={18} /></Button></div>
-    {!minimizada && <form className="point-form" onSubmit={handleSubmit(dados => salvar(dados, 'validado'))}><div className="point-fields"><div className="form-grid"><label>Número do ponto<input {...register('numero')} aria-invalid={!!errors.numero} /></label><label>Operação<select {...register('operacao')}>{Object.entries(OPERACOES).map(([valor, nome]) => <option key={valor} value={valor}>{nome}</option>)}</select></label></div>{errors.numero && <small className="error" role="alert">{errors.numero.message}</small>}{errors.root?.validacao && <p className="error" role="alert">{errors.root.validacao.message}</p>}
-      <section className="point-section" aria-label="Estruturas do ponto"><BuscaCatalogo rotulo="Adicionar estrutura" placeholder="Digite N, N4 ou parte do nome…" itens={catalogos.estruturas.filter(e => !estruturas.includes(e.id))} selecionar={id => { if (id && !estruturas.includes(id)) setValue('estruturas', [...estruturas, id], { shouldDirty: true }); }} />
-        {!!estruturas.length && <ul className="point-picked-list" aria-label="Estruturas adicionadas">{estruturas.map(id => <li key={id}><span>{catalogos.estruturas.find(e => e.id === id)?.nome ?? 'Estrutura indisponível'}</span><Button type="button" variant="ghost" size="icon" aria-label={`Remover estrutura ${catalogos.estruturas.find(e => e.id === id)?.nome ?? id}`} onClick={() => setValue('estruturas', estruturas.filter(e => e !== id), { shouldDirty: true })}><X size={14} /></Button></li>)}</ul>}
-      </section>
-      <BuscaCatalogo rotulo="Poste" placeholder="Ex.: 11200 ou poste concre DT…" itens={postes} valor={watch('poste_id') ?? undefined} selecionar={id => setValue('poste_id', id || null, { shouldDirty: true })} />
-      <section className="point-section" aria-label="Cabos do ponto"><BuscaCatalogo rotulo="Adicionar cabo" placeholder="Digite código ou descrição do cabo…" itens={cabos.filter(c => !cabosSelecionados.includes(c.id))} selecionar={id => { if (id && !cabosSelecionados.includes(id)) setValue('cabos_ids', [...cabosSelecionados, id], { shouldDirty: true }); }} />
-        {!!cabosSelecionados.length && <ul className="point-picked-list" aria-label="Cabos adicionados">{cabosSelecionados.map(id => { const cabo = cabos.find(c => c.id === id); return <li key={id}><span>{cabo ? `${cabo.codigo} · ${cabo.descricao}` : 'Cabo indisponível'}</span><Button type="button" size="icon" variant="ghost" aria-label={`Remover cabo ${cabo?.codigo ?? id}`} onClick={() => setValue('cabos_ids', cabosSelecionados.filter(c => c !== id), { shouldDirty: true })}><X size={14} /></Button></li>; })}</ul>}
-      </section>
-      <section className="point-linear-length"><label htmlFor="ponto-metragem-linear">Metragem linear (m)</label><div className="linear-length-input"><input id="ponto-metragem-linear" type="number" inputMode="decimal" step="any" min="0" {...register('metragem_linear', { valueAsNumber: true })} aria-invalid={!!errors.metragem_linear} aria-describedby="ponto-metragem-ajuda" /><span>m</span></div><p id="ponto-metragem-ajuda" className="point-field-help">Informe uma vez. A mesma metragem será aplicada a cada cabo adicionado.</p>{errors.metragem_linear && <small className="error" role="alert">{errors.metragem_linear.message}</small>}</section>
-      <section className="point-section"><BuscaCatalogo rotulo="Adicionar mão de obra" placeholder="Digite código ou descrição do serviço…" itens={catalogos.maoObra.filter(m => !servicos.some(s => s.mao_obra_id === m.id))} selecionar={id => { if (id) adicionarServico({ mao_obra_id: id, quantidade: 1 }); }} /><p className="point-field-help">Serviços adicionais serão somados à mão de obra gerada pelas regras.</p>
-        {!!servicos.length && <ul className="point-picked-list" aria-label="Mão de obra adicional">{servicos.map((servico, indice) => { const registro = catalogos.maoObra.find(m => m.id === servico.mao_obra_id); return <li key={servico.id} className="point-service"><span>{registro ? `${registro.codigo} · ${registro.descricao}` : 'Mão de obra indisponível'}</span><label>Quantidade<input type="number" step="any" min="0.0001" inputMode="decimal" {...register(`mao_obra_adicional.${indice}.quantidade`, { valueAsNumber: true })} aria-label={`Quantidade de ${registro?.descricao ?? 'mão de obra'}`} /></label><Button type="button" variant="ghost" size="icon" aria-label={`Remover mão de obra ${registro?.codigo ?? indice + 1}`} onClick={() => removerServico(indice)}><X size={14} /></Button>{errors.mao_obra_adicional?.[indice]?.quantidade && <small className="error" role="alert">{errors.mao_obra_adicional[indice]?.quantidade?.message}</small>}</li>; })}</ul>}
-      </section>
-      <section className="point-section" aria-label="Materiais avulsos do ponto"><BuscaCatalogo rotulo="Adicionar material" placeholder="Digite código ou descrição do material…" itens={catalogos.materiais.filter(m => !materiais.some(item => item.material_id === m.id))} selecionar={id => { if (id) adicionarMaterial({ material_id: id, quantidade: 1 }); }} /><p className="point-field-help">Somados aos materiais das estruturas. Para cabos avulsos, informe a quantidade em metros.</p>
-        {!!materiais.length && <ul className="point-picked-list" aria-label="Materiais adicionais">{materiais.map((item, indice) => { const registro = catalogos.materiais.find(m => m.id === item.material_id); return <li key={item.id} className="point-service"><span>{registro ? `${registro.codigo} · ${registro.descricao}` : 'Material indisponível'}</span><label>{registro?.categoria === 'cabo' ? 'Metros' : 'Quantidade'}<input type="number" step="any" min="0.0001" inputMode="decimal" {...register(`materiais_adicionais.${indice}.quantidade`, { valueAsNumber: true })} aria-label={`Quantidade de material ${registro?.descricao ?? ''}`} /></label><Button type="button" variant="ghost" size="icon" aria-label={`Remover material ${registro?.codigo ?? indice + 1}`} onClick={() => removerMaterial(indice)}><X size={14} /></Button>{errors.materiais_adicionais?.[indice]?.quantidade && <small className="error" role="alert">{errors.materiais_adicionais[indice]?.quantidade?.message}</small>}</li>; })}</ul>}
-      </section>
-      {!catalogos.materiais.length && !catalogos.maoObra.length && <p className="notice">Os catálogos estão vazios. Você pode marcar pontos e salvar rascunhos; carregue os catálogos para selecionar os itens da medição.</p>}
-    </div><div className="dialog-actions"><Button disabled={isSubmitting} type="submit">Salvar e validar</Button><Button disabled={isSubmitting} variant="outline" type="button" onClick={() => void handleSubmit(dados => salvar(dados, 'pendente'))()}>Salvar rascunho</Button><Button disabled={isSubmitting} type="button" variant="ghost" onClick={() => { if (window.confirm(`Excluir o ponto ${ponto.numero}?`)) void excluirPonto(ponto.id).then(fechar).catch(() => toast.error('Falha ao excluir.')); }}>Excluir</Button><Button type="button" variant="ghost" onClick={fechar}>Cancelar</Button></div></form>}
+    {!minimizada && <form className="point-form" onSubmit={e => { e.preventDefault(); void salvar('validado'); }}><div className="point-fields"><label>Número do ponto<input value={numero} onChange={e => setNumero(e.target.value)} required aria-label="Número do ponto" /></label>
+      <div className="point-operation-tabs" role="tablist" aria-label="Operações do ponto">{(['I', 'D', 'R'] as const).map(op => <button type="button" key={op} role="tab" id={`aba-ponto-${op}`} aria-controls={`painel-ponto-${op}`} aria-selected={aba === op} tabIndex={aba === op ? 0 : -1} onClick={() => { setAba(op); setErro(''); }} onKeyDown={e => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); const ops: Operacao[] = ['I','D','R']; const proxima = ops[(ops.indexOf(op) + (e.key === 'ArrowRight' ? 1 : 2)) % 3]; setAba(proxima); document.getElementById(`aba-ponto-${proxima}`)?.focus(); } }}>{NOMES[op]}{(operacoes[op]?.materiais.length || operacoes[op]?.mao_obra.length) ? <span className="operation-filled" aria-label="Preenchida" /> : null}</button>)}</div>
+      {erro && <p className="error" role="alert">{erro}</p>}
+      <div role="tabpanel" id={`painel-ponto-${aba}`} aria-labelledby={`aba-ponto-${aba}`} className="point-operation-content" key={aba}>
+      {aba === 'R' && <p className="notice">Nesta aba, as seleções preenchem somente a mão de obra. Inclua materiais abaixo apenas se precisar; eles aparecerão separadamente no resumo.</p>}
+      <section className="point-section"><BuscaCatalogo rotulo="Adicionar estrutura" placeholder="Digite N1, N4 ou parte do nome…" itens={catalogos.estruturas.filter(e => !atual.estruturas.some(i => i.estrutura_id === e.id))} selecionar={id => { if (id) fontes({ estruturas: [...atual.estruturas, { estrutura_id: id, quantidade: 1 }] }); }} /><ul className="point-picked-list" aria-label="Estruturas adicionadas">{atual.estruturas.map(i => { const nome = catalogos.estruturas.find(e => e.id === i.estrutura_id)?.nome ?? 'Estrutura indisponível'; return <li key={i.estrutura_id} className="point-service"><span>{nome}</span><Quantidade valor={i.quantidade} rotulo={`Quantidade da estrutura ${nome}`} alterar={quantidade => fontes({ estruturas: atual.estruturas.map(e => e.estrutura_id === i.estrutura_id ? { ...e, quantidade } : e) })} /><Button type="button" variant="ghost" size="icon" aria-label={`Remover estrutura ${nome}`} onClick={() => fontes({ estruturas: atual.estruturas.filter(e => e.estrutura_id !== i.estrutura_id) })}><X size={14} /></Button></li>; })}</ul></section>
+      {(['postes', 'cabos'] as const).map(tipo => <section className="point-section" key={tipo}><BuscaCatalogo rotulo={tipo === 'postes' ? 'Adicionar poste' : 'Adicionar cabo'} placeholder="Digite código ou descrição…" itens={catalogos.materiais.filter(m => m.categoria === (tipo === 'postes' ? 'poste' : 'cabo') && !atual[tipo].some(i => i.material_id === m.id))} selecionar={id => { if (id) fontes({ [tipo]: [...atual[tipo], { material_id: id, quantidade: 1 }] }); }} /><ul className="point-picked-list" aria-label={tipo === 'postes' ? 'Postes adicionados' : 'Cabos adicionados'}>{atual[tipo].map(i => <li key={i.material_id} className="point-service"><span>{materialNome(i.material_id)}</span><Quantidade valor={i.quantidade} metros={tipo === 'cabos'} rotulo={`${tipo === 'cabos' ? 'Metragem do cabo' : 'Quantidade do poste'} ${materialCodigo(i.material_id)}`} alterar={quantidade => fontes({ [tipo]: atual[tipo].map(e => e.material_id === i.material_id ? { ...e, quantidade } : e) })} /><Button type="button" variant="ghost" size="icon" aria-label={`Remover ${tipo === 'cabos' ? 'cabo' : 'poste'} ${materialCodigo(i.material_id)}`} onClick={() => fontes({ [tipo]: atual[tipo].filter(e => e.material_id !== i.material_id) })}><X size={14} /></Button></li>)}</ul></section>)}
+      <p className="point-field-help">As seleções acima preenchem as listas abaixo. Confira e ajuste o que será medido nesta operação.</p>
+      <section className="point-section point-final-items" aria-label="Materiais finais"><h3>Materiais</h3><BuscaCatalogo rotulo="Adicionar material" itens={catalogos.materiais.filter(m => !atual.materiais.some(i => i.material_id === m.id))} selecionar={id => { if (id) editar({ ...atual, materiais: [...atual.materiais, { material_id: id, quantidade: 1 }] }); }} /><ul className="point-picked-list" aria-label="Materiais da medição">{atual.materiais.map(i => <li key={i.material_id} className="point-service"><span>{materialNome(i.material_id)}</span><Quantidade valor={i.quantidade} metros={catalogos.materiais.find(m => m.id === i.material_id)?.categoria === 'cabo'} rotulo={`Quantidade final do material ${materialCodigo(i.material_id)}`} alterar={quantidade => editar({ ...atual, materiais: atual.materiais.map(e => e.material_id === i.material_id ? { ...e, quantidade } : e) })} /><Button type="button" variant="ghost" size="icon" aria-label={`Excluir material final ${materialCodigo(i.material_id)}`} onClick={() => editar({ ...atual, materiais: atual.materiais.filter(e => e.material_id !== i.material_id) })}><X size={14} /></Button></li>)}</ul>{!atual.materiais.length && <p className="point-field-help">Nenhum material nesta operação.</p>}</section>
+      <section className="point-section point-final-items" aria-label="Mão de obra final"><h3>Mão de obra</h3><BuscaCatalogo rotulo="Adicionar mão de obra" itens={catalogos.maoObra.filter(m => !atual.mao_obra.some(i => i.mao_obra_id === m.id))} selecionar={id => { if (id) editar({ ...atual, mao_obra: [...atual.mao_obra, { mao_obra_id: id, quantidade: 1 }] }); }} /><ul className="point-picked-list" aria-label="Mão de obra da medição">{atual.mao_obra.map(i => { const registro = catalogos.maoObra.find(m => m.id === i.mao_obra_id); return <li key={i.mao_obra_id} className="point-service"><span>{registro ? `${registro.codigo} · ${registro.descricao}` : 'Serviço indisponível'}</span><Quantidade valor={i.quantidade} rotulo={`Quantidade final da mão de obra ${registro?.codigo ?? i.mao_obra_id}`} alterar={quantidade => editar({ ...atual, mao_obra: atual.mao_obra.map(e => e.mao_obra_id === i.mao_obra_id ? { ...e, quantidade } : e) })} /><Button type="button" variant="ghost" size="icon" aria-label={`Excluir mão de obra final ${registro?.codigo ?? i.mao_obra_id}`} onClick={() => editar({ ...atual, mao_obra: atual.mao_obra.filter(e => e.mao_obra_id !== i.mao_obra_id) })}><X size={14} /></Button></li>; })}</ul>{!atual.mao_obra.length && <p className="point-field-help">Nenhum serviço nesta operação.</p>}</section>
+      </div>
+    </div><div className="dialog-actions"><Button disabled={salvando || carregando} type="submit">Salvar e validar</Button><Button disabled={salvando} variant="outline" type="button" onClick={() => void salvar('pendente')}>Salvar rascunho</Button><Button disabled={salvando} type="button" variant="ghost" onClick={() => { if (window.confirm(`Excluir o ponto ${ponto.numero} em todas as operações?`)) void excluirPonto(ponto.id).then(fechar).catch(() => toast.error('Falha ao excluir.')); }}>Excluir</Button><Button type="button" variant="ghost" onClick={fechar}>Cancelar</Button></div></form>}
   </div>;
   if (mobile) return <div className="bottom-sheet" style={minimizada ? { height: 60 } : undefined}>{conteudo}</div>;
-  const width = Math.min(500, window.innerWidth - 32); const height = Math.min(780, window.innerHeight - 40);
+  const width = Math.min(600, window.innerWidth - 32), height = Math.min(850, window.innerHeight - 40);
   return <div className="floating-bounds"><Rnd bounds="parent" default={{ x: posicao.x || Math.max(16, window.innerWidth - width - 32), y: posicao.y || 20, width, height }} minWidth={360} minHeight={minimizada ? 56 : 320} maxWidth="100%" maxHeight="100%" size={minimizada ? { width, height: 56 } : undefined} dragHandleClassName="dialog-handle" cancel="button,input,select,textarea" onDragStop={(_e, data) => { posicao = { x: data.x, y: data.y }; }} className="floating-point">{conteudo}</Rnd></div>;
 }

@@ -19,3 +19,12 @@ it('recupera uma seleção inexistente sem perder os PDFs e normaliza página in
   const pranchas = [{ id: 'a', nome: 'a.pdf', pdf: new Blob() }];
   expect(atualizarMedicao({ pranchas, pranchaAtivaId: 'removida', paginaAtiva: -1, pontos: [], resultado: null })).toMatchObject({ pranchas, pranchaAtivaId: 'a', paginaAtiva: 1 });
 });
+it('restaura as três operações e as listas finais sem recriar itens apagados', async () => {
+  const { composicaoVazia } = await import('../../aplicacao/composicao-ponto');
+  const c = { ...composicaoVazia(), estruturas: [{ estrutura_id: 'N1', quantidade: 2 }], base: { materiais: [{ material_id: 'm', quantidade: 6 }], mao_obra: [] }, materiais: [{ material_id: 'm', quantidade: 9 }] };
+  const pranchas = [{ id: 'a', nome: 'a.pdf', pdf: new Blob() }];
+  const novo = { ...ponto, prancha_id: 'a', operacoes: { I: c, D: composicaoVazia(), R: composicaoVazia() } };
+  const restaurado = atualizarMedicao({ pranchas, pontos: [novo], resultado: null, versaoPontos: 6 });
+  expect(restaurado.pontos[0].operacoes).toEqual(novo.operacoes);
+  expect(restaurado.pontos[0].operacoes?.I?.materiais[0].quantidade).toBe(9);
+});

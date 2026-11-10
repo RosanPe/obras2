@@ -6,9 +6,18 @@ export interface Estrutura { id: string; nome: string; itens: { material_id: str
 export interface Regra { id: string; nome: string; tipo_gatilho: 'material' | 'estrutura' | 'contexto'; material_id: string | null; estrutura_id: string | null; material_ids?: string[]; estrutura_ids?: string[]; categorias: Categoria[]; operacoes: Operacao[]; saidas: { mao_obra_id: string; quantidade: number }[] }
 export interface Catalogos { materiais: Material[]; maoObra: MaoObra[]; estruturas: Estrutura[]; regras: Regra[] }
 export interface PranchaPdf { id: string; nome: string; pdf: Blob }
+export interface ItemMaterialPonto { material_id: string; quantidade: number }
+export interface ItemMaoObraPonto { mao_obra_id: string; quantidade: number }
+export interface ComposicaoOperacao {
+  estruturas: { estrutura_id: string; quantidade: number }[];
+  postes: ItemMaterialPonto[]; cabos: ItemMaterialPonto[];
+  materiais: ItemMaterialPonto[]; mao_obra: ItemMaoObraPonto[];
+  base: { materiais: ItemMaterialPonto[]; mao_obra: ItemMaoObraPonto[] };
+}
 export interface PontoMedicao {
   id: string; numero: string; pagina: number; x_percent: number; y_percent: number;
   status: 'pendente' | 'validado'; operacao: Operacao;
+  operacoes?: Partial<Record<Operacao, ComposicaoOperacao>>;
   estrutura_id: string | null; estruturas_secundarias: string[]; poste_id: string | null;
   prancha_id?: string;
   materiais_adicionais?: { material_id: string; quantidade: number }[];
@@ -20,7 +29,7 @@ export interface LinhaResultado { codigo: string; descricao: string; unidade: st
 export interface ResultadoPorPonto { prancha?: string; pranchaId?: string; numeroPonto: string; pagina: number; operacao: Operacao; estrutura: string | null; metragemLinear: number; itens: (LinhaResultado & { tipo: 'material' | 'mao_obra' })[] }
 export interface ResultadoMedicao {
   metragemLinearTotal: number;
-  materiaisInstalacao: LinhaResultado[]; materiaisDesativacao: LinhaResultado[];
+  materiaisInstalacao: LinhaResultado[]; materiaisDesativacao: LinhaResultado[]; materiaisReinstalacao?: LinhaResultado[];
   maoObraInstalacao: LinhaResultado[]; maoObraDesativacao: LinhaResultado[]; maoObraReinstalacao: LinhaResultado[];
   porPonto: ResultadoPorPonto[];
 }

@@ -6,5 +6,9 @@ export const CATALOGOS_VAZIOS: Catalogos = { materiais: [], maoObra: [], estrutu
 export const OPERACOES = { I: 'Instalação', D: 'Desativação', R: 'Reinstalação' } as const;
 export const ABAS_RESULTADO = [
   ['materiaisInstalacao', 'Materiais Instalação'], ['materiaisDesativacao', 'Materiais Desativação'],
-  ['maoObra', 'Mão de Obra'],
+  ['materiaisReinstalacao', 'Materiais Reinstalação'], ['maoObra', 'Mão de Obra'],
 ] as const;
+
+export function obterAbasResultado(resultado: { materiaisReinstalacao?: unknown[] }) {
+  return ABAS_RESULTADO.filter(([chave]) => chave !== 'materiaisReinstalacao' || !!resultado.materiaisReinstalacao?.length);
+}

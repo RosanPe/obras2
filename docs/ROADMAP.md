@@ -5,7 +5,7 @@ O documento `inicio.md` permanece como especificação completa. Esta etapa avan
 ## Implementado nesta etapa
 
 - Área do PDF maior e modo expandido, com a janela do ponto acima do desenho.
-- Modos Mover, Marcar ponto e Editar pontos; primeiro PDF abre em Marcar.
+- Marcação/edição por clique e navegação com botão direito, sem seletor de modos.
 - Pan livre, zoom pela roda, slider, botões e pinça pelo react-zoom-pan-pinch; enquadramento e ajuste à largura.
 - Rasterização em canvas separado, debounce e limite de pixels, preservando o desenho durante o zoom.
 - Criação imediata da janela ao marcar, fallback de UUID para HTTP na rede local, marcadores com tamanho constante, prévia de arraste e destaque de edição.
@@ -21,7 +21,7 @@ O documento `inicio.md` permanece como especificação completa. Esta etapa avan
 - Estruturas em lista: digitar, selecionar, adicionar várias e remover individualmente.
 - Poste e cabos com a mesma busca (11200 → 11/200; alum 2/0 ca → CABO ALUM CA 2/0).
 - Mão de obra adicional por ponto, com vários serviços e quantidade editável, somada às saídas automáticas das regras.
-- Sem multiplicador de quantidade de pontos. Busca única de cabos com lista de selecionados e metragem linear compartilhada logo abaixo. Cadastro apenas pela categoria cabo, sem BT/MT. O resumo e o Excel somam o percurso uma vez por ponto, além de consolidar separadamente as quantidades de cada cabo. Totais de unidades diferentes não são misturados no rodapé.
+- Quantidades por estrutura/poste e metros por cabo em cada operação; fontes preenchem listas finais editáveis. Cadastro de cabo sem BT/MT. Mesma regra de cabo usa a maior metragem. Totais de unidades diferentes não são misturados no rodapé.
 - Atualização dos pontos locais antigos preservando posições e itens; resumo invalidado e pontos com multiplicador antigo devolvidos a rascunho para revisão.
 
 ## Resumo e Excel
@@ -36,11 +36,11 @@ O documento `inicio.md` permanece como especificação completa. Esta etapa avan
 
 ## Validação
 
-- 88 testes Vitest locais (85 no CI e 3 opcionais da base importada) e 6 testes do conversor Python do motor, Excel, geometria, busca por nomenclaturas, formulário do ponto, migração local e validação de catálogos.
+- 83 testes Vitest locais (80 no CI e 3 opcionais da base importada) e 6 testes do conversor Python do motor, Excel, geometria, busca por nomenclaturas, formulário do ponto, migração local e validação de catálogos.
 - Brave headless no Ubuntu, em perfil isolado: PDF de duas páginas, upload, criação/reedição/arraste de pontos, zoom, pan, área expandida e restauração após reload.
 - Buscas N/11200/alum 2/0 ca, adicionar/remover estruturas, seleção por teclado e serviços manuais com quantidades.
 - Login real pela interface e criação de cabo sem subtipo no Supabase pelo editor de materiais.
-- Campo de metragem logo abaixo da lista de cabos em desktop e viewport mobile. Cada cabo recebe o comprimento informado; o percurso é somado uma vez por ponto no Excel.
+- Metragem na linha de cada cabo; listas finais e abas de operação verificadas em desktop/mobile.
 - Download real do Excel, reabertura do arquivo e conferência do total linear e das quantidades de material.
 - Os registros de teste foram removidos e a sessão temporária encerrada. Testes em aparelhos físicos continuam pendentes.
 
@@ -59,7 +59,7 @@ O documento `inicio.md` permanece como especificação completa. Esta etapa avan
 
 - 633 materiais, 483 serviços, 59 estruturas e 65 regras importados, todos com UUIDs v4 novos.
 - 14 códigos repetidos unificados, com remapeamento de todos os IDs antigos; 554 itens de estrutura e 97 saídas de regra preservados.
-- 444 alvos válidos preservados, incluindo 47 regras com vínculos múltiplos. O motor mede regras vinculadas a cabos pela soma dos metros dos cabos correspondentes; os demais gatilhos permanecem por ponto. O editor permite revisar todos os alvos.
+- 444 alvos válidos preservados, incluindo 47 regras com vínculos múltiplos. As sugestões de mão de obra de cabo usam a maior metragem por regra; estruturas/postes multiplicam as saídas por quantidade. O resumo lê as listas finais salvas. O editor permite revisar todos os alvos.
 - Banco e site conferidos: contagens e UUIDs, buscas, abertura de N4 e de regra com 46 materiais, criação/edição de regra temporária com múltiplos alvos e rollback após referência inválida.
 - A carga original trouxe 45 cabos com rótulo BT. A distinção BT/MT foi retirada da aplicação: todos aparecem pela categoria cabo. Os metadados históricos no banco e nos artefatos de importação foram preservados.
 - Artefatos de conversão, relatório e reversão em `base-exemplo/convertida/`. A reversão não foi executada.
@@ -119,3 +119,17 @@ Detecção automática de círculos e relatório PDF permanecem opcionais de fas
 - Teste de navegador usa API simulada: nenhum e-mail real é enviado nem senha real modificada. A entrega final usa o provedor configurado no Supabase e a URL autorizada do site.
 
 - Navegador validou cancelamento, envio sem troca da sessão master, erro do provedor, recuperação por link, confirmação da senha, retorno sem loop e recusa de link expirado mesmo com sessão anterior.
+
+
+## Ponto com três operações e listas finais — 09/11/2026
+
+- Croqui sem bloco de contadores, roteiro de ajuda ou seletor de modos; Gerar resumo junto de Nova medição.
+- Botão esquerdo marca/edita, botão direito arrasta o PDF; páginas, zoom, pinça e várias pranchas preservados.
+- Abas Instalado/Desativado/Reinstalado no mesmo ponto, com preenchimento independente e salvamento conjunto.
+- Quantidades por estrutura/poste e metragem por cabo. Estruturas/postes multiplicam materiais e regras; cabos na mesma regra usam a maior metragem.
+- Listas finais de materiais e serviços pré-preenchidas, editáveis e exclusíveis. O resumo e Excel usam somente essas listas; mudanças nas regras não sobrescrevem a medição salva.
+- Conversão local de pontos antigos ao carregar catálogos, preservando posição/itens e solicitando revisão das novas quantidades.
+- Reinstalação preenche automaticamente somente mão de obra. Materiais entram por inclusão manual; se houver, uma lista própria aparece no resumo/Excel.
+- Correção do observador de sessão para não limpar/recarregar os catálogos a cada troca de rota.
+
+- Validação da reformulação: 83 testes Vitest, incluindo substituição dos cenários antigos pelas novas regras. Navegador verificou quantidades finais, I/D/R, cabos 50/52, exclusões, reinstalação sem materiais automáticos, Excel e recarga sem recalcular regras, em desktop/mobile sem erros JS.

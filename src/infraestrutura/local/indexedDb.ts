@@ -11,7 +11,7 @@ export interface MedicaoArmazenada {
 }
 export function atualizarMedicao(dados: MedicaoArmazenada): MedicaoLocal & { avisoAtualizacao?: string } {
   const pranchas = dados.pranchas ?? (dados.pdf ? [{ id: 'prancha-original', nome: dados.nomePdf || 'Croqui.pdf', pdf: dados.pdf }] : []);
-  const mudou = ![3, 4, 5].includes(dados.versaoPontos ?? 0) || dados.pontos.some(p => 'cabo_bt_id' in p && !!p.cabo_bt_id && p.cabo_bt_id === p.cabo_mt_id);
+  const mudou = ![3, 4, 5, 6].includes(dados.versaoPontos ?? 0) || dados.pontos.some(p => 'cabo_bt_id' in p && !!p.cabo_bt_id && p.cabo_bt_id === p.cabo_mt_id);
   const pontos = dados.pontos.map(p => ({ ...atualizarPonto(p), prancha_id: p.prancha_id ?? pranchas[0]?.id, materiais_adicionais: p.materiais_adicionais ?? [] }));
   return {
     pranchas, pranchaAtivaId: pranchas.find(p => p.id === dados.pranchaAtivaId)?.id ?? pranchas[0]?.id ?? null,
@@ -25,4 +25,4 @@ export async function carregarMedicao() {
   const dados = await get<MedicaoArmazenada>('obras:medicao:v1');
   return dados ? atualizarMedicao(dados) : undefined;
 }
-export const salvarMedicao = (medicao: MedicaoLocal) => set('obras:medicao:v1', { ...medicao, versaoPontos: 5 });
+export const salvarMedicao = (medicao: MedicaoLocal) => set('obras:medicao:v1', { ...medicao, versaoPontos: 6 });

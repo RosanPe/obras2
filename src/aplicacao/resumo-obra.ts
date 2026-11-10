@@ -23,6 +23,7 @@ export function obterResumoObra(resultado: ResultadoMedicao) {
   return {
     materiaisInstalacao: [...resultado.materiaisInstalacao].sort(compararDescricao),
     materiaisDesativacao: [...resultado.materiaisDesativacao].sort(compararDescricao),
+    materiaisReinstalacao: [...resultado.materiaisReinstalacao ?? []].sort(compararDescricao),
     maoObra: consolidarMaoObra(resultado),
   };
 }

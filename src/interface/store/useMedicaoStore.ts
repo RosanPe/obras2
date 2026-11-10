@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { carregarMedicao, salvarMedicao, type MedicaoLocal } from '../../infraestrutura/local/indexedDb';
-import type { PontoMedicao, ResultadoMedicao } from '../../dominio/tipos';
+import { obterOperacoesPonto } from '../../aplicacao/composicao-ponto';
+import type { Catalogos, PontoMedicao, ResultadoMedicao } from '../../dominio/tipos';
 const vazio: MedicaoLocal = { pranchas: [], pranchaAtivaId: null, paginaAtiva: 1, pontos: [], resultado: null };
 let fila = Promise.resolve();
 interface Estado extends MedicaoLocal {
   pronto: boolean; erroPersistencia: string | null; avisoAtualizacao: string | null;
+  atualizarModeloPontos: (catalogos: Catalogos) => Promise<void>;
   restaurar: () => Promise<void>; iniciarNovaMedicao: () => Promise<void>;
   adicionarPdfs: (arquivos: { pdf: Blob; nome: string }[]) => Promise<void>;
   selecionarPrancha: (id: string) => Promise<void>; selecionarPagina: (pagina: number) => Promise<void>;
@@ -35,6 +37,16 @@ export const useMedicaoStore = create<Estado>((set, get) => {
       try { const dados = await carregarMedicao(); set({ ...(dados ?? vazio), avisoAtualizacao: dados?.avisoAtualizacao ?? null, pronto: true }); }
       catch { set({ pronto: true, erroPersistencia: 'Não foi possível restaurar os dados locais.' }); }
     },
+    atualizarModeloPontos: async catalogos => { let converteu = false; await persistir(estado => {
+      let atualizados = 0;
+      const pontos = estado.pontos.map(p => {
+        if (p.operacoes) return p;
+        try { const operacoes = obterOperacoesPonto(p, catalogos); atualizados++; return { ...p, operacoes }; }
+        catch { return p; }
+      });
+      converteu = atualizados > 0;
+      return atualizados ? { pontos, resultado: null } : {};
+    }); if (converteu) set({ avisoAtualizacao: 'Pontos anteriores organizados por operação. Confira as listas finais: estruturas e postes agora usam quantidade e cabos da mesma regra usam a maior metragem. Gere o resumo novamente.' }); },
     iniciarNovaMedicao: async () => { await persistir(() => ({ ...vazio }), false); set({ avisoAtualizacao: null }); },
     adicionarPdfs: arquivos => persistir(estado => {
       if (!arquivos.length) return {};

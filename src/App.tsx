@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HashRouter, NavLink, Navigate, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
-import { CheckCircle2, ClipboardList, Database, Download, FileText, LogOut, Map, Moon, ShieldCheck, Sun } from 'lucide-react';
+import { CheckCircle2, ClipboardList, Database, Download, LogOut, Map, Moon, Sun } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { calcularMedicao } from './aplicacao/motor-regras';
-import { consolidarMaoObra, obterResumoObra } from './aplicacao/resumo-obra';
-import { ABAS_RESULTADO } from './dominio/constantes';
+import { obterResumoObra } from './aplicacao/resumo-obra';
+import { ABAS_RESULTADO, obterAbasResultado } from './dominio/constantes';
 import type { PontoMedicao } from './dominio/tipos';
 import { baixarExcel } from './infraestrutura/exportacao/excel';
 import { carregarTema, salvarTema } from './infraestrutura/local/preferencias';
@@ -33,14 +33,16 @@ function Resumo() {
   const [aba, setAba] = useState<(typeof ABAS_RESULTADO)[number][0]>('materiaisInstalacao');
   if (!resultado) return <div className="panel empty"><ClipboardList size={32} /><h2>Seu resumo aparece aqui.</h2><p>Valide os pontos e clique em Gerar resumo.</p></div>;
   const resumo = obterResumoObra(resultado);
-  return <section className="panel p-6"><div className="section-heading"><div><h2>Resumo da obra</h2><p className="muted">{resultado.porPonto.length} pontos medidos em {pranchas.length} PDF(s) · 3 consolidações + detalhamento por ponto</p></div><Button onClick={() => baixarExcel(resultado)}><Download size={16} />Baixar Excel da medição</Button></div><p className="notice mb-5">Exporte o Excel ao terminar. A medição está salva apenas neste navegador.</p><div className="subtabs">{ABAS_RESULTADO.map(([chave, nome]) => <Button variant={aba === chave ? 'default' : 'ghost'} size="sm" key={chave} onClick={() => setAba(chave)}>{nome} ({resumo[chave].length})</Button>)}</div><TabelaResumo key={aba} linhas={resumo[aba]} ordenarPorDescricao /></section>;
+  return <section className="panel p-6"><div className="section-heading"><div><h2>Resumo da obra</h2><p className="muted">{new Set(resultado.porPonto.map(p => `${p.pranchaId ?? p.prancha}-${p.numeroPonto}`)).size} pontos medidos em {pranchas.length} PDF(s) · listas finais consolidadas + detalhamento por ponto</p></div><Button onClick={() => baixarExcel(resultado)}><Download size={16} />Baixar Excel da medição</Button></div><p className="notice mb-5">Exporte o Excel ao terminar. A medição está salva apenas neste navegador.</p><div className="subtabs">{obterAbasResultado(resultado).map(([chave, nome]) => <Button variant={aba === chave ? 'default' : 'ghost'} size="sm" key={chave} onClick={() => setAba(chave)}>{nome} ({resumo[chave].length})</Button>)}</div><TabelaResumo key={aba} linhas={resumo[aba]} ordenarPorDescricao /></section>;
 }
 function Aplicacao() {
   const navigate = useNavigate();
   const localizacao = useLocation();
+  const navegar = useRef(navigate); navegar.current = navigate;
+  const usuarioCatalogos = useRef<string | null | undefined>(undefined);
   const retornoConsumido = useRef(false);
   const [erroRecuperacao, setErroRecuperacao] = useState(erroNoLinkDeAcesso);
-  const { pontos, pranchas, pronto, erroPersistencia, avisoAtualizacao, guardarResultado } = useMedicaoStore();
+  const { pontos, pranchas, pronto, atualizarModeloPontos, erroPersistencia, avisoAtualizacao, guardarResultado } = useMedicaoStore();
   const { catalogos, carregando, super: superUsuario } = useCatalogosStore();
   const [email, setEmail] = useState<string | null>(null);
   const [sessaoPronta, setSessaoPronta] = useState(!supabaseConfigurado);
@@ -48,7 +50,10 @@ function Aplicacao() {
   const [editando, setEditando] = useState<PontoMedicao | null>(null);
   const fechar = useCallback(() => setEditando(null), []);
   useEffect(() => { void useMedicaoStore.getState().restaurar(); }, []);
-  useEffect(() => observarSessao((novoEmail, id, evento) => { setEmail(novoEmail); setSessaoPronta(true); if (evento === 'PASSWORD_RECOVERY' || (!retornoConsumido.current && evento === 'INITIAL_SESSION' && (retornoDeRecuperacao || erroNoLinkDeAcesso))) { retornoConsumido.current = true; setErroRecuperacao(evento !== 'PASSWORD_RECOVERY' && (erroNoLinkDeAcesso || !id)); navigate('/redefinir-senha', { replace: true }); } useCatalogosStore.getState().limpar(); if (id) void useCatalogosStore.getState().carregar().catch(erro => toast.error(`Falha ao carregar catálogos: ${String(erro)}`)); }), [navigate]);
+  useEffect(() => observarSessao((novoEmail, id, evento) => { setEmail(novoEmail); setSessaoPronta(true); if (evento === 'PASSWORD_RECOVERY' || (!retornoConsumido.current && evento === 'INITIAL_SESSION' && (retornoDeRecuperacao || erroNoLinkDeAcesso))) { retornoConsumido.current = true; setErroRecuperacao(evento !== 'PASSWORD_RECOVERY' && (erroNoLinkDeAcesso || !id)); navegar.current('/redefinir-senha', { replace: true }); } if (usuarioCatalogos.current !== id) { usuarioCatalogos.current = id; useCatalogosStore.getState().limpar(); if (id) void useCatalogosStore.getState().carregar().catch(erro => toast.error(`Falha ao carregar catálogos: ${String(erro)}`)); } }), []);
+  useEffect(() => {
+    if (pronto && !carregando && (catalogos.materiais.length || catalogos.maoObra.length || catalogos.estruturas.length) && pontos.some(p => !p.operacoes)) void atualizarModeloPontos(catalogos).catch(() => toast.error('Não foi possível atualizar os pontos antigos.'));
+  }, [pronto, carregando, catalogos, pontos, atualizarModeloPontos]);
   useEffect(() => { document.documentElement.classList.toggle('dark', escuro); salvarTema(escuro); }, [escuro]);
   const calculo = useMemo(() => { try { return { resultado: calcularMedicao({ ...catalogos, pontos, pranchas }), erro: null }; } catch (erro) { return { resultado: null, erro: erro instanceof Error ? erro.message : 'Falha no cálculo.' }; } }, [catalogos, pontos, pranchas]);
   const validados = pontos.filter(p => p.status === 'validado').length;
@@ -61,15 +66,13 @@ function Aplicacao() {
     if (pendentes && !window.confirm(`${pendentes} ponto(s) pendente(s) não entrarão no resumo. Continuar apenas com os validados?`)) return;
     try { await guardarResultado(calculo.resultado); navigate('/resumo'); toast.success('Resumo gerado.'); } catch { toast.error('Não foi possível salvar o resumo localmente.'); }
   };
-  const totalMateriais = calculo.resultado ? calculo.resultado.materiaisInstalacao.length + calculo.resultado.materiaisDesativacao.length : 0;
-  const totalServicos = calculo.resultado ? consolidarMaoObra(calculo.resultado).length : 0;
   return <><main className="app-main"><div className="app-navigation"><nav className="tabs" aria-label="Navegação principal">{[['/croqui', 'Croqui', Map], ['/resumo', 'Resumo', ClipboardList], ['/auditoria', 'Auditoria', CheckCircle2], ['/cadastros', 'Cadastros', Database]].filter(([url]) => url !== '/auditoria' || superUsuario).map(([url, nome, Icon]) => { const Componente = Icon as typeof Map; return <NavLink key={String(url)} to={String(url)}><Componente size={17} />{String(nome)}</NavLink>; })}</nav><div className="app-nav-actions">{email && <span className="nav-user-email" title={email}>{email}</span>}<Button size="icon" variant="ghost" aria-label={escuro ? 'Ativar tema claro' : 'Ativar tema escuro'} onClick={() => setEscuro(!escuro)}>{escuro ? <Sun size={18} /> : <Moon size={18} />}</Button>{email && <Button size="icon" variant="ghost" aria-label="Sair" title={`Sair de ${email}`} onClick={() => void sair().catch(erro => toast.error(String(erro)))}><LogOut size={17} /></Button>}</div></div>
       {!supabaseConfigurado && <div className="notice mb-5">Supabase ainda não configurado. O PDF e os rascunhos já funcionam localmente. Configure o <code>.env.local</code> para autenticar e carregar catálogos.</div>}
       {avisoAtualizacao && <div className="notice mb-5" role="status">{avisoAtualizacao}</div>}
       {erroPersistencia && <div className="error-banner" role="alert">{erroPersistencia}</div>}
       {calculo.erro && <div className="error-banner" role="alert">{calculo.erro} Confira os vínculos dos pontos com o catálogo atual.</div>}
-      <Routes><Route path="/croqui" element={<><div className="stats"><div><span className="stat-label">Pontos marcados</span><strong>{String(pontos.length).padStart(2, '0')}</strong></div><div><span className="stat-label"><i className="dot green" />Validados</span><strong>{String(validados).padStart(2, '0')}</strong></div><div><span className="stat-label"><i className="dot amber" />Pendentes</span><strong>{String(pendentes).padStart(2, '0')}</strong></div><div className="stat-summary"><span className="stat-label">Quantitativo em tempo real</span><p><b>{totalMateriais}</b> linhas de materiais <span>·</span> <b>{totalServicos}</b> de mão de obra</p></div><Button disabled={!validados || carregando || !!calculo.erro} onClick={() => void gerar()}><ClipboardList size={16} />Gerar resumo</Button></div><PDFViewer editar={setEditando} pontoEditando={editando?.id} fecharPonto={fechar} /><div className="help-row"><p><span>01</span> Adicione as pranchas</p><span className="help-line" /><p><span>02</span> Marque e valide os pontos</p><span className="help-line" /><p><span>03</span> Gere o resumo e exporte</p></div></>} /><Route path="/resumo" element={<Resumo />} /><Route path="/auditoria" element={carregando ? <p role="status">Verificando acesso…</p> : superUsuario ? <Administracao /> : <Navigate to="/croqui" replace />} /><Route path="/cadastros" element={<Cadastros />} /><Route path="*" element={<Navigate to="/croqui" replace />} /></Routes>
-      <footer className="app-footer"><span><ShieldCheck size={14} /> PDF, pontos e medição ficam apenas neste navegador.</span><span><FileText size={14} />Exporte o Excel ao concluir.</span></footer>
+      <Routes><Route path="/croqui" element={<><PDFViewer editar={setEditando} pontoEditando={editando?.id} fecharPonto={fechar} gerarResumo={() => void gerar()} podeGerarResumo={!!validados && !carregando && !calculo.erro && pontos.every(p => !!p.operacoes)} /></>} /><Route path="/resumo" element={<Resumo />} /><Route path="/auditoria" element={carregando ? <p role="status">Verificando acesso…</p> : superUsuario ? <Administracao /> : <Navigate to="/croqui" replace />} /><Route path="/cadastros" element={<Cadastros />} /><Route path="*" element={<Navigate to="/croqui" replace />} /></Routes>
+
     </main>{editando && <JanelaFlutuantePonto key={editando.id} ponto={editando} fechar={fechar} />}</>;
 }
 export default function App() { return <HashRouter><Aplicacao /><Toaster richColors position="bottom-right" /></HashRouter>; }

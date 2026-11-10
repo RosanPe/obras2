@@ -1,55 +1,265 @@
-# Obras · Medição no croqui
+# Obras - Medicao
 
-Aplicação SPA para medir redes de distribuição diretamente sobre as pranchas PDF da obra. O escopo completo está em [inicio.md](inicio.md). A etapa atual inclui croqui interativo e editores de catálogos conectados ao Supabase, com consulta para usuários autenticados e edição restrita a contas autorizadas.
+Aplicação para medir obras de redes de distribuição de energia diretamente nas pranchas PDF do projeto. O usuário marca pontos no croqui, preenche as operações de cada ponto, confere materiais e mão de obra e exporta a medição consolidada em Excel.
 
-## Executar no Ubuntu
+**O resumo e o Excel usam exclusivamente as listas finais salvas de Materiais e Mão de obra dos pontos validados.** As regras ajudam a preencher essas listas; não são executadas novamente ao gerar o resumo.
 
-Node.js e npm são as únicas ferramentas de sistema necessárias. Se usar Homebrew: `brew install node`. O CI utiliza Node 22; o desenvolvimento inicial também foi verificado com Node 26 instalado pelo Homebrew.
+- Repositório: [RosanPe/obras2](https://github.com/RosanPe/obras2).
+- Endereço de publicação: [rosanpe.github.io/obras2](https://rosanpe.github.io/obras2/).
+- [Guia de publicação](docs/GITHUB-PAGES.md) e [histórico/pendências](docs/ROADMAP.md).
+
+## Funcionalidades
+
+- Vários PDFs na mesma obra, com seleção de prancha e página.
+- Marcação por clique, edição e reposicionamento dos pontos sobre o desenho.
+- Movimento do PDF pelo botão direito, zoom pela roda, pinça no celular, enquadramento e área expandida.
+- Abas **Instalado**, **Desativado** e **Reinstalado** no mesmo ponto.
+- Quantidade individual de estruturas/postes e metragem individual dos cabos.
+- Materiais e mão de obra preenchidos pelas regras, com inclusão, alteração e exclusão manual nas listas finais.
+- Resumo alfabético, mão de obra consolidada das três operações e detalhamento por ponto no Excel.
+- Rascunhos, validação, restauração local e botão **Nova medição** com confirmação.
+- Catálogos compartilhados no Supabase, com escrita restrita a usuários autorizados.
+- Auditoria exclusiva do administrador, concessão/revogação de permissões e envio de link para redefinir senha.
+- Tema claro/escuro, janela do ponto arrastável/redimensionável no computador e painel inferior no celular.
+
+## Onde os dados ficam
+
+| Dados | Armazenamento |
+| --- | --- |
+| Conta e autenticação | Supabase Auth |
+| Materiais, mão de obra, estruturas, regras e composições | Supabase Postgres |
+| Permissões e histórico de alterações dos catálogos | Supabase Postgres |
+| PDFs, pontos, operações, quantidades finais e resumo corrente | Somente no navegador, via IndexedDB |
+| Resultado exportado | Arquivo Excel baixado pelo usuário |
+
+PDFs e medições não são enviados ao Supabase. O trabalho local pertence à origem do site e ao navegador/dispositivo, não à conta: sair não apaga a obra, mas entrar em outro computador não transfere a medição. O localhost e o site publicado têm dados locais separados. Limpar os dados do navegador remove o trabalho local; exporte o Excel ao concluir.
+
+## Executar localmente
+
+### Requisitos
+
+- Node.js **22.12 ou superior** e npm; o CI usa a linha **22**, indicada em [.nvmrc](.nvmrc).
+- Python 3 para testar o conversor ou converter uma base de importação.
+- Navegador com suporte a PDF.js, canvas e IndexedDB.
+
+No Ubuntu com Homebrew, Node.js pode ser instalado com `brew install node`. As bibliotecas da aplicação são instaladas pelo npm.
 
 ```bash
+git clone https://github.com/RosanPe/obras2.git
+cd obras2
 npm ci
 cp .env.example .env.local
+```
+
+Preencha `.env.local` com os valores do seu projeto:
+
+```dotenv
+VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=SUA_CHAVE_PUBLICA
+VITE_BASE_PATH=/obras/
+```
+
+Use a chave pública **publishable** ou **anon**. As variáveis `VITE_` são incorporadas ao frontend; não use chave secret/service_role nem senhas nesse arquivo de configuração do cliente.
+
+```bash
 npm run dev
 ```
 
-Abra o endereço exibido pelo Vite, normalmente `http://localhost:5173/obras/`. Sem credenciais do Supabase, a aplicação abre em ambiente local: carregamento de PDF e rascunhos funcionam; não há catálogo fictício nem escrita anônima.
+Abra o endereço exibido pelo Vite, normalmente `http://localhost:5173/obras/`. O nome do repositório é `obras2`, mas o caminho padrão de desenvolvimento continua `/obras/`; o workflow detecta o caminho de produção automaticamente. Reinicie o Vite depois de alterar variáveis de ambiente.
 
-```bash
-npm test
-npm run build
-npm run preview
-```
+Sem URL/chave do Supabase, o carregamento de PDFs e os rascunhos locais funcionam, mas não há catálogo fictício nem edição anônima no banco.
 
-O lockfile fixa as versões verificadas. O override de `postcss-selector-parser` usa a versão corrigida com Tailwind 3. Não é necessária nenhuma outra instalação pelo Homebrew nesta etapa.
+### Comandos disponíveis
 
-## O que funciona nesta etapa
+| Comando | Finalidade |
+| --- | --- |
+| `npm ci` | Instalar as dependências fixadas no lockfile |
+| `npm run dev` | Iniciar o desenvolvimento com Vite |
+| `npm test` | Executar os testes Vitest |
+| `npm run test:watch` | Executar Vitest em modo de acompanhamento |
+| `npm run test:importacao` | Executar os testes Python do conversor |
+| `npm run verificar:supabase` | Consultar a saúde do Auth sem imprimir a chave |
+| `npm run build` | Verificar TypeScript e gerar `dist/` |
+| `npm run build:pages` | Validar a configuração pública, resolver o caminho e compilar para Pages |
+| `npm run preview` | Conferir localmente o build de `dist/` |
 
-- Base Vite + React 18 + TypeScript, Tailwind, botão shadcn/ui, HashRouter e tema claro/escuro.
-- Login, cadastro por e-mail e senha, logout e carregamento dos catálogos, quando o Supabase estiver configurado.
-- PDF.js com worker local, upload de vários arquivos sem servidor e seleção de prancha/página. Área de trabalho ampliada, opção de expandir, modos Mover / Marcar ponto / Editar pontos, roda e slider de zoom de 10% a 800%, enquadramento e ajuste à largura. Pan livre e pinça com react-zoom-pan-pinch; rasterização nítida após o zoom, sem esconder a folha a cada gesto. Apenas a página atual é renderizada, com limite de pixels do canvas para conter o uso de memória.
-- Pontos com coordenadas relativas, criação por clique no modo Marcar, reposicionamento com prévia por arraste em qualquer modo, tamanho constante no zoom e destaque do ponto em edição. Janela arrastável/redimensionável no desktop e painel inferior no mobile; exclusão, rascunho e validação. Identificadores funcionam também em HTTP na rede local.
-- PDFs, pontos, prancha/página ativa e último resumo restaurados via IndexedDB. Falhas de persistência aparecem na interface. Alterar um ponto invalida o resumo anterior.
-- Motor puro com testes: estruturas, materiais diretos, cabos por metragem, regras, operações, serviços manuais, consolidação e detalhamento.
-- Três tabelas de resumo com busca/ordenação via TanStack Table: materiais de instalação, materiais de desativação e mão de obra única em ordem alfabética; Excel com quatro abas, inclusive **Por Ponto**. Auditoria administrativa exclusiva do super, com registros, histórico e gestão de permissões.
-- Cadastros com criação, edição, exclusão, busca e ordenação; filtro de categoria para materiais. Editores de composição de estruturas e regras com busca por código/descrição e quantidades. Estruturas e regras são salvas por RPCs transacionais.
-- Schema de catálogos compartilhados com RLS e permissão de edição controlada no banco; workflow de verificação e publicação no Pages.
+O diagnóstico `verificar:supabase` não cria usuários nem registros. Acesso às tabelas e permissões dependem de uma sessão autenticada.
 
-Autenticação, CRUD dos quatro catálogos, RPCs, rollback e políticas de consulta/edição foram verificados no Supabase real. Os testes usam registros temporários removidos ao final. A base de exemplo foi convertida e carregada no Supabase. A importação/exportação CSV continua pendente. Veja [docs/ROADMAP.md](docs/ROADMAP.md) antes de considerar o aplicativo pronto para produção.
+## Fluxo de medição
+
+### Pranchas e navegação
+
+1. Clique em **Carregar PDFs** e selecione um ou vários arquivos.
+2. Use **Adicionar PDFs** para incluir outras pranchas sem apagar as anteriores.
+3. Escolha o arquivo no seletor **Prancha** e navegue pelas páginas com as setas ou o seletor de página.
+4. Clique no desenho para criar um ponto. Clique num marcador existente para editar ou arraste o marcador com o botão esquerdo para reposicioná-lo.
+
+Cada ponto pertence a uma prancha e página. Somente os marcadores da página atual aparecem sobre o desenho; a numeração dos pontos é única em toda a obra. Arquivos com nomes iguais são distinguidos pelo índice da prancha.
+
+| Ação | Controle |
+| --- | --- |
+| Criar ponto / abrir ponto existente | Clique esquerdo |
+| Reposicionar marcador | Arrastar o marcador com o botão esquerdo |
+| Mover o PDF | Segurar o botão direito e arrastar |
+| Movimento temporário com botão esquerdo | Segurar Espaço com o croqui em foco |
+| Aproximar / afastar | Roda do mouse, botões ou slider de zoom |
+| Navegar no celular | Arrastar a folha e usar pinça com dois dedos |
+| Ajustar a visualização | Enquadrar, Largura ou clicar no percentual para 100% |
+| Ampliar a área de trabalho | Botão de expandir/recolher |
+
+A tela não tem bloco de contadores nem seletor de modos. **Gerar resumo** fica ao lado de **Nova medição**. Somente a página atual do PDF é renderizada, com limite de pixels do canvas e ajuste de nitidez após o zoom.
+
+### Operações no mesmo ponto
+
+O formulário abre em **Instalado** e oferece três abas independentes:
+
+| Aba | Uso |
+| --- | --- |
+| Instalado | Materiais e serviços de instalação |
+| Desativado | Materiais e serviços de desativação |
+| Reinstalado | Serviços de reinstalação; materiais somente por inclusão manual |
+
+Um único marcador pode ter as três operações. Trocar de aba conserva as edições da janela. **Salvar e validar** grava e valida todas as operações preenchidas; **Salvar rascunho** grava o ponto como pendente e o exclui da medição até ser validado novamente. Fechar ou cancelar a janela não confirma as edições em andamento.
+
+O número do ponto é obrigatório e não pode repetir outro ponto da obra. As quantidades devem ser finitas e positivas. Para validar, pelo menos uma operação precisa ter materiais ou mão de obra nas listas finais.
+
+### Seleções e listas finais
+
+Na parte superior da operação, adicione **estruturas**, **postes** e **cabos**. Cada linha permite editar a quantidade e remover a seleção. Cabos usam metros na própria linha, sem campo de metragem compartilhada.
+
+As seleções preenchem duas listas de conferência:
+
+- **Materiais:** quantidades que serão medidas nessa operação.
+- **Mão de obra:** serviços e quantidades que serão medidos nessa operação.
+
+Nessas listas finais é possível adicionar itens avulsos, alterar quantidades e excluir itens sugeridos. **É exatamente o conteúdo final salvo e validado que entra no resumo e no Excel.** Alterar essas listas não dispara novas regras automaticamente.
+
+A busca combina código, descrição e nome, sem depender de acentos, caixa ou ordem dos termos. Exemplos: `N` encontra N1/N2/N3/N4; `11200` encontra um poste com nomenclatura `11/200`; `alum 2/0 ca` encontra cabo com esses termos. Setas e Enter permitem escolher um resultado.
+
+## Regras de preenchimento
+
+### Estruturas e postes
+
+- **Estrutura N1 × 2:** multiplica por 2 os materiais da composição e as quantidades de saída das regras correspondentes.
+- **Poste × 3:** gera 3 unidades do material e multiplica por 3 a saída da regra correspondente.
+- Se vários componentes da mesma estrutura correspondem à mesma regra, a estrutura contribui uma vez pela quantidade selecionada, evitando repetição por vínculos alternativos.
+- Regras podem usar material, estrutura ou contexto/categoria como gatilho e restringir as operações I/D/R.
+
+### Cabos e maior metragem por regra
+
+Cada cabo conserva sua quantidade nos materiais. Cabos que acionam a **mesma regra** usam a maior metragem para a mão de obra dessa regra:
+
+| Seleção | Material | Mão de obra da mesma regra, com coeficiente 1 |
+| --- | --- | --- |
+| Cabo 2: 50 m | 50 m do cabo 2 | |
+| Cabo 2/0: 52 m | 52 m do cabo 2/0 | **52**, considerando os dois cabos |
+
+Uma saída com coeficiente 2 geraria 104 de serviço nesse exemplo. Regras distintas conservam seus próprios gatilhos e máximos. Cabos presentes na composição de estruturas também são considerados pelos metros medidos, agrupados por material.
+
+### Reinstalado
+
+Estruturas, postes e cabos nessa aba preenchem automaticamente **somente a mão de obra**. A lista de materiais começa vazia.
+
+Se precisar medir materiais reinstalados, adicione-os manualmente na lista final. Quando houver itens, o resumo e o Excel mostram **Materiais Reinstalação** separadamente, sem misturá-los com instalação ou desativação.
+
+### Edições manuais e alterações posteriores nas regras
+
+As regras são usadas para preencher sugestões quando as seleções são feitas ou alteradas. Linhas ainda automáticas acompanham as mudanças de quantidade das seleções. Quantidades modificadas manualmente e exclusões nas listas finais são preservadas.
+
+Gerar o resumo ou exportar o Excel não executa as regras novamente. Alterar o cadastro de uma regra ou a composição de uma estrutura também não modifica automaticamente as quantidades finais já salvas nos pontos.
+
+## Resumo e Excel
+
+**Gerar resumo** considera os pontos validados de todas as pranchas e páginas. Se houver pendentes, pede confirmação para continuar sem eles. Alterar um ponto salvo invalida o resumo anterior; gere-o novamente depois de concluir a revisão.
+
+As listas são ordenadas alfabeticamente pela descrição, com busca, ordenação e rolagem interna:
+
+| Lista / aba do Excel | Conteúdo |
+| --- | --- |
+| Materiais Instalação | Materiais finais das operações Instalado |
+| Materiais Desativação | Materiais finais das operações Desativado |
+| Materiais Reinstalação | Materiais incluídos manualmente em Reinstalado; aparece somente quando há itens |
+| Mão de Obra | Serviços consolidados das três operações |
+| Por Ponto | Detalhamento dos itens finais por ponto e operação; disponível no Excel |
+
+O arquivo é baixado como `medicao_YYYY-MM-DD_HHmm.xlsx`. Sem materiais reinstalados, são quatro abas; com materiais reinstalados, são cinco. Códigos são texto e quantidades são células numéricas.
+
+**Por Ponto** registra número do ponto, página, operação, estruturas/quantidades, tipo, código, descrição, unidade, quantidade, metragem linear e prancha. O mesmo ponto pode ter linhas I/D/R. A metragem linear corresponde ao maior comprimento de cabo das listas finais daquela operação e é preenchida apenas na primeira linha da combinação ponto/operação; a célula L2 mostra a soma dessas metragens.
+
+Unidades padrão: **UN** para materiais gerais/postes, **m** para cabos e **SV** para mão de obra. Os catálogos não têm campo de unidade; os totais por unidade são mantidos separados.
+
+## Persistência, migração e nova medição
+
+PDFs, pontos, operações, listas finais, prancha/página ativa e resultado são restaurados via IndexedDB. Falhas de persistência aparecem na interface. As gravações são serializadas para evitar sobrescritas entre alterações concorrentes; se a adição de PDFs falhar por falta de espaço, os arquivos anteriores são preservados.
+
+- **Nova medição:** pede confirmação e limpa todos os PDFs, pontos e resumo locais. Mantém a sessão, os catálogos e o tema.
+- **Remover prancha atual:** pede confirmação e exclui somente o PDF escolhido e seus pontos, invalidando o resumo.
+- **Adicionar PDFs:** valida o lote antes de adicionar os arquivos e preserva as outras pranchas.
+
+O PDF único de versões antigas é migrado para a primeira prancha. Ao carregar os catálogos, pontos do modelo anterior são organizados na aba da operação correspondente, mantendo posição, página, vínculos e itens avulsos. Estruturas/postes recebem quantidade 1 e os cabos mantêm os comprimentos antigos. As listas são preenchidas segundo as regras atuais; o aviso de atualização pede conferir as quantidades e gerar o resumo novamente. Pontos com medidas antigas incompatíveis podem exigir revisão como rascunho. Depois de convertidos, os ajustes finais salvos não são recalculados ao abrir a obra.
+
+A reformulação dos pontos usa a versão local 6 e não exige mudança no banco do Supabase.
+
+## Catálogos e permissões
+
+A aba **Cadastros** permite consultar materiais, mão de obra, estruturas e regras. Usuários autorizados também podem criar, editar e excluir registros. Estruturas e regras têm editores de composição com busca; são salvas por RPCs transacionais.
+
+| Perfil | Permissões |
+| --- | --- |
+| Usuário autenticado comum | Consultar catálogos, marcar pontos, medir e exportar |
+| Editor autorizado | Permissões comuns e criação/edição/exclusão de catálogos |
+| Administrador super/master | Acesso total e auditoria, gestão de usuários/permissões e solicitação de link de senha |
+
+Os catálogos são compartilhados entre contas autenticadas. `user_id` identifica o criador do registro. A RLS e as funções do banco validam a escrita; ocultar botões na interface não é a única proteção. Acesso anônimo aos catálogos é bloqueado, e metadados enviados no cadastro não promovem usuários.
+
+A conta master atual é `pedro.hrosan@hotmail.com`. A migração administrativa vincula o UUID dessa conta à tabela protegida de administradores. Conceder edição a outro usuário não o transforma em super.
+
+## Administração, auditoria e senha
+
+A aba **Auditoria**, exclusiva do super, oferece:
+
+- **Usuários e permissões:** consulta das contas e concessão/revogação de edição dos catálogos.
+- **Todos os registros:** consulta dos catálogos atuais, incluindo suas composições.
+- **Histórico de alterações:** criação, edição, exclusão e mudanças de permissão, com autor, data e dados anteriores/novos. O histórico começa na ativação da auditoria e não é retroativo.
+
+PDFs e pontos de outros navegadores não são centralizados nessa página.
+
+Na linha de uma conta, **Redefinir senha** solicita confirmação e envia um pedido de recuperação ao Supabase Auth. Antes do envio, o repositório consulta novamente a função protegida de usuários para obter o e-mail real do destinatário. A solicitação não troca a sessão do administrador nem define uma senha por ele.
+
+O destinatário abre o link recebido e preenche **Nova senha** e **Confirmar nova senha**, com no mínimo oito caracteres. A tela trata o evento `PASSWORD_RECOVERY`, erros do provedor e links inválidos/expirados. A entrega real depende do serviço de e-mail configurado no Supabase.
 
 ## Configurar o Supabase
 
-1. Crie um projeto Supabase e execute [supabase/schema.sql](supabase/schema.sql) uma vez no SQL Editor de um banco novo. O script cria seis tabelas: quatro catálogos e duas tabelas de composição. Não cria projetos, pontos ou medições. Em seguida, execute [a migração dos editores](supabase/migrations/20261024_catalogos_crud.sql), que cria as funções `salvar_estrutura` e `salvar_regra`. Depois execute [a migração de permissões](supabase/migrations/20261024_permissoes_catalogos.sql), que habilita o catálogo compartilhado com edição restrita. Por fim, aplique [a migração de alvos múltiplos](supabase/migrations/20261024_regras_multiplos_alvos.sql), que preserva os vínculos das regras da base importada. Aplique também [a simplificação de cabos](supabase/migrations/20261024_categoria_cabo_unica.sql) para cadastrar cabos somente por categoria. Se as tabelas já existem, revise o schema antes de aplicar; não o execute por cima de um banco existente.
-2. Em Authentication, habilite e-mail/senha e configure a Site URL para a URL publicada. Configure as Redirect URLs de localhost e produção se habilitar confirmação de e-mail.
-3. Preencha `.env.local` com `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` (chave pública anon ou publishable). Nunca use uma chave service role no frontend.
-4. Execute `npm run verificar:supabase` para testar o serviço Auth sem expor a chave no terminal. Reinicie o Vite. Crie uma conta, confirme o e-mail e faça login.
+### Banco existente deste projeto
 
-Registrar o MCP do Supabase no Codex não preenche as variáveis da aplicação. O MCP precisa estar autenticado e suas ferramentas carregadas na sessão; o frontend precisa da URL e da chave pública em `.env.local`, que é ignorado pelo Git. Não coloque senha ou chave service role no frontend.
+O banco utilizado no desenvolvimento já recebeu o schema, as migrações e a carga inicial. Para usar esse mesmo banco, configure a URL e a chave pública; não reaplique o schema ou a importação sobre os registros existentes.
 
-No cadastro de materiais há código, descrição e categoria, sem tipo de cabo. A coluna histórica `tipo_cabo` foi mantida no banco somente para compatibilidade com os arquivos da carga original; ela não é consultada nem exigida pelo aplicativo.
+O registro do MCP do Supabase no Codex não preenche `.env.local`. O frontend precisa da sua própria URL/chave pública.
 
-Os catálogos são compartilhados entre usuários autenticados. `user_id` identifica o criador dos registros; não restringe a leitura. Somente contas com `pode_editar = true` em `catalogo_permissoes` podem criar, editar ou excluir. A função `pode_editar_catalogos()` verifica essa permissão no servidor; os botões da interface e os repositórios também a verificam.
+### Banco novo
 
-Para autorizar uma conta já existente, execute como administrador no SQL Editor:
+Execute no SQL Editor, como administrador e nesta ordem:
+
+1. [schema.sql](supabase/schema.sql): catálogos, composições e políticas iniciais.
+2. [catalogos_crud.sql](supabase/migrations/20261024_catalogos_crud.sql): funções de gravação dos editores.
+3. [permissoes_catalogos.sql](supabase/migrations/20261024_permissoes_catalogos.sql): catálogos compartilhados e edição restrita.
+4. [regras_multiplos_alvos.sql](supabase/migrations/20261024_regras_multiplos_alvos.sql): vínculos alternativos das regras.
+5. [categoria_cabo_unica.sql](supabase/migrations/20261024_categoria_cabo_unica.sql): cadastro de cabos somente por categoria, sem exigir BT/MT.
+6. Crie a conta master `pedro.hrosan@hotmail.com` no Supabase Auth, pelo cadastro da aplicação ou pelo painel. Confirme o e-mail quando essa opção estiver habilitada.
+7. [administracao_super.sql](supabase/migrations/20261024_administracao_super.sql): administrador, auditoria e RPCs de gestão. Essa migração exige que a conta master já exista.
+
+As migrações são scripts de evolução do schema e não devem ser reaplicadas indiscriminadamente. A coluna histórica `tipo_cabo` permanece no banco para compatibilidade da carga antiga, mas não é exigida nem consultada pelo aplicativo.
+
+### Autenticação e links de retorno
+
+Em **Authentication → URL Configuration**, configure:
+
+- **Site URL:** `https://rosanpe.github.io/obras2/` para a publicação deste repositório.
+- **Redirect URLs:** a mesma raiz de produção e as URLs locais que forem utilizadas, como `http://localhost:5173/obras/`.
+
+Os links de confirmação e recuperação precisam retornar a uma URL permitida. O pedido de redefinição usa a origem e o caminho base da página do administrador: para enviar links destinados ao site publicado, use o botão nesse site. Habilite e-mail/senha no Auth e configure o serviço de envio de e-mail conforme o ambiente.
+
+A primeira concessão de edição também pode ser feita pelo SQL Editor, quando necessário:
 
 ```sql
 insert into public.catalogo_permissoes(user_id, pode_editar)
@@ -57,103 +267,92 @@ select id, true from auth.users where email = 'EMAIL_DO_EDITOR'
 on conflict (user_id) do update set pode_editar = true;
 ```
 
-Novas contas sem essa autorização podem consultar os catálogos e realizar medições normalmente. A tabela de permissões não aceita escrita pela API de usuários; campos enviados no cadastro ou em `user_metadata` não concedem edição. Para revogar, altere `pode_editar` para `false` no banco. O acesso anônimo aos catálogos é bloqueado.
+No uso normal, o master gerencia essas permissões pela Auditoria. Os testes [permissoes.sql](supabase/tests/permissoes.sql) e [administracao.sql](supabase/tests/administracao.sql), executados como postgres, validam as políticas em transações revertidas.
 
-O projeto indicado em `.env.local` já recebeu as tabelas, funções e políticas. A conta indicada pelo responsável foi autorizada. Não reaplique o schema inicial nesse banco. Nenhuma senha foi incluída no código ou nas migrações.
+## Publicar e atualizar no GitHub Pages
 
-As chamadas de dados passam por `infraestrutura/supabase/repositorios/`; autenticação fica no serviço `auth.ts`. O teste [supabase/tests/permissoes.sql](supabase/tests/permissoes.sql) simula leitor e acesso anônimo, testa a restrição de escrita/RPC e impede autopromoção, revertendo todos os dados de teste ao terminar.
+O remoto do projeto é `git@github.com:RosanPe/obras2.git`, e a branch de publicação é **main**.
 
-## Interagir com o croqui
-
-A aplicação começa diretamente pelas abas. O cabeçalho de apresentação foi removido; tema e saída ficam ao lado da navegação. No resumo, ficam as tabelas e a exportação, sem quadro de metragem linear.
-
-1. Use **Carregar PDFs** para selecionar um ou vários arquivos. Depois, **Adicionar PDFs** inclui mais pranchas sem apagar as anteriores. Escolha o arquivo em **Prancha** e a página pelos botões anterior/próxima ou pelo seletor, ao lado de **Mover / Marcar ponto / Editar pontos**. Cada página mostra apenas seus próprios pontos.
-2. Clique sobre um círculo vermelho do desenho. Isso cria um marcador interativo e abre o formulário. Círculos desenhados no arquivo são parte do PDF: a detecção automática ainda não está implementada.
-3. Digite para buscar as estruturas, poste, cabos e mão de obra. As estruturas ficam numa lista e podem ser adicionadas/removidas individualmente; os serviços adicionais têm quantidade editável. Informe a **Metragem linear (m)** uma única vez, logo abaixo da lista de cabos. Use a busca **Adicionar cabo** para incluir vários materiais da categoria cabo; esse mesmo comprimento será aplicado a cada cabo adicionado. Não há separação BT/MT. Salve um rascunho ou valide. Clique em qualquer marcador para reabrir, inclusive no modo Mover.
-
-   A busca combina termos em qualquer ordem, sem depender de acentos, caixa e separadores: `N` lista N1, N2, N3, N4; `11200` encontra `POSTE CONCRE DT 11/200`; `alum 2/0 ca` encontra `CABO ALUM CA 2/0`. As setas e Enter permitem selecionar pelo teclado. Ao final do formulário, **Adicionar material** permite buscar vários materiais avulsos, editar suas quantidades e removê-los. Eles somam aos itens das estruturas e participam dos gatilhos de mão de obra. Cabos avulsos usam quantidade em metros; os cabos da lista principal continuam usando a metragem compartilhada do ponto. O formulário não contém observações.
-4. Use **Mover** para arrastar a folha livremente. A roda aumenta/diminui o zoom junto ao cursor; no celular, use dois dedos para pinça. Os botões e o slider também controlam o zoom.
-5. **Enquadrar** mostra a folha inteira; **Largura** ajusta ao espaço horizontal; clicar no percentual restaura 100%. O botão no canto superior direito expande a área e mantém a janela do ponto disponível por cima.
-6. Para reposicionar um ponto, arraste o próprio marcador. O deslocamento não cria outro ponto. As coordenadas e o tamanho visual continuam corretos com o zoom.
-
-Após focar o desenho, segure Espaço para mover temporariamente; `+` e `-` controlam o zoom. `Esc` fecha a janela; um segundo `Esc`, com o foco no croqui, recolhe a área expandida. `Delete` em um marcador focado pede confirmação de exclusão.
-
-## Regras adotadas nesta etapa
-
-- Apenas pontos validados entram no motor. Um ponto válido tem número único e ao menos uma estrutura, poste, cabo, material avulso ou serviço adicional. Cada marcador representa um ponto físico; o campo quantidade de pontos foi retirado.
-- Cada estrutura adicionada contribui com seus materiais e quantidades cadastradas, uma vez por ponto. O poste direto contribui com uma unidade. Todos os cabos adicionados ao ponto usam a mesma metragem linear, em metros, somada por código no consolidado. O total linear do Excel conta o comprimento de cada ponto uma única vez, independentemente da quantidade de cabos. O resumo não exibe um quadro de metragem linear. A metragem não multiplica os demais materiais. Regras de mão de obra vinculadas a cabos usam os metros dos cabos correspondentes.
-- Regras de poste, estrutura e outros materiais aplicam a quantidade da saída uma vez por ponto. Nas regras de material ou contexto vinculadas a cabos, a quantidade da saída é multiplicada pela soma dos metros dos cabos correspondentes. Contexto usa correspondência de **qualquer** categoria selecionada. A mão de obra adicionada manualmente ao ponto soma às regras; se o código coincidir, as quantidades são consolidadas.
-- Uma regra pode ter vários materiais ou estruturas alternativos como gatilho. Os alvos não lineares disparam a regra uma vez por ponto. Para cabos, somam-se os metros de cada cabo correspondente, sem repetir o mesmo vínculo.
-- A mesma estrutura selecionada como principal e secundária é aplicada uma vez. Um material direto também presente na estrutura soma suas quantidades.
-- **Reinstalação (R) gera somente mão de obra**, pois o escopo possui apenas duas listas consolidadas de materiais (I/D). Os materiais da estrutura e diretos continuam servindo de gatilho em R, mas não são exportados como consumo. Esta interpretação precisa de conferência com as regras do projeto original antes do uso real.
-- Referências ausentes e quantidades inválidas bloqueiam o cálculo em vez de omitir itens silenciosamente. UN para materiais gerais/postes, m para cabos e SV para serviços estão em `dominio/constantes.ts`. Os rodapés totalizam separadamente cada unidade.
-
-Não foi possível consultar o conteúdo do repositório original durante esta etapa. O motor segue `inicio.md`; compatibilidade com casos reais do projeto original permanece pendente.
-
-## Exportação e dados locais
-
-A mão de obra é apresentada em uma única aba, consolidando as quantidades por código, descrição e unidade, com ordenação alfabética em português. Resumos locais já salvos no formato anterior também usam essa apresentação, sem refazer os pontos. As duas abas de materiais permanecem separadas por instalação/desativação.
-
-O PDF único de versões anteriores vira automaticamente a primeira prancha; seus pontos mantêm página, posição, dados e numeração. Novos pontos têm numeração única em toda a obra, inclusive entre PDFs. Pontos salvos no modelo antigo são atualizados ao restaurar, preservando PDF, posições e seleções. A metragem compartilhada é preservada. As antigas seleções separadas de cabos são restauradas na lista única com os mesmos IDs. Resultados do modelo anterior com metragem linear continuam utilizáveis. Pontos do modelo intermediário com comprimentos BT/MT iguais são unificados; se eram diferentes, voltam a rascunho com metragem zero para o usuário informar o comprimento correto. Apenas resultados de modelos incompatíveis são invalidados para novo cálculo; pontos que usavam multiplicador diferente de 1 também voltam a rascunho para revisão. A atualização aparece num aviso na interface.
-
-Na aba Croqui, valide os pontos e use **Gerar resumo**. Pendentes exigem confirmação para serem excluídos do cálculo. Em Resumo, **Baixar Excel da medição** gera `medicao_YYYY-MM-DD_HHmm.xlsx` com Materiais Instalação, Materiais Desativação, Mão de Obra e Por Ponto. A aba Mão de Obra soma os mesmos serviços das operações I/D/R e ordena pela descrição, em ordem alfabética. Códigos permanecem texto; quantidades são células numéricas. As quatro abas existem mesmo quando vazias. As operações originais continuam registradas no detalhamento Por Ponto. A coluna **Prancha** identifica o arquivo de origem e seu índice; **Página** identifica a página dentro desse PDF, distinguindo arquivos com nomes iguais. O resumo e o Excel consolidam todos os pontos validados de todas as pranchas e páginas. Na aba Por Ponto, a coluna **Metragem linear (m)** é preenchida apenas na primeira linha de cada ponto para permitir soma sem duplicidade; a célula L2 mostra o total linear. Exemplo: um ponto de 25 m com três cabos gera 25 m de cada cabo, mas apenas 25 m de percurso linear.
-
-PDF e medição pertencem ao navegador/dispositivo, não à conta. Sair não apaga o trabalho local. Os itens dos catálogos compartilhados ficam disponíveis às demais contas autenticadas; a medição corrente permanece local ao navegador. Limpar dados do navegador remove a medição; exporte o Excel ao concluir. Adicionar PDFs preserva os arquivos e pontos existentes. **Nova medição** limpa todos os PDFs, pontos e resumo locais após confirmação, para começar outra obra; exporte o Excel antes de confirmar. Os catálogos e a sessão permanecem disponíveis. **Remover prancha atual** pede confirmação e exclui somente o PDF selecionado e seus pontos, invalidando o resumo para novo cálculo. PDFs inválidos não são adicionados; um lote é validado por inteiro antes de ser salvo.
-
-## Base de exemplo importada
-
-A base `base-exemplo/base-medicao.json` foi carregada no Supabase: **633 materiais únicos, 483 serviços, 59 estruturas e 65 regras**, com 554 itens de estrutura, 97 saídas e 444 vínculos de gatilho. Os 647 materiais originais tinham 14 códigos repetidos, unificados sem quebrar as referências. Todos os novos IDs são UUIDs v4.
-
-A conversão original preservou os rótulos BT/MT da origem, mas essa distinção foi retirada do aplicativo: os 45 materiais de cabo são consultados e cadastrados apenas pela categoria cabo. A quantidade `3KG` foi normalizada para `3`, três referências inexistentes a `CE1` foram ignoradas e um item repetido em RELIGADOR foi consolidado. Detalhes e arquivos de reversão em `base-exemplo/convertida/LEIA-ME.md` (arquivo local, não versionado).
-
-O conversor não acessa a rede nem usa senha. Para novas cargas, use um backup atualizado e um diretório novo para preservar os manifestos da importação anterior:
+1. Em **Settings → Pages → Build and deployment → Source**, selecione **GitHub Actions**.
+2. Em **Settings → Secrets and variables → Actions**, cadastre `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` como repository secrets ou variables, usando a URL e a chave pública do ambiente desejado.
+3. Faça o commit e envie para `main`.
+4. Acompanhe **Actions → Verificar e publicar no GitHub Pages** e confira a conclusão do job `deploy`.
 
 ```bash
-python3 scripts/converter-base.py --entrada base-exemplo/base-medicao.json --backup CAMINHO_DO_BACKUP_ATUAL.json --saida DIRETORIO_NOVA_CARGA --usuario-id UUID_DO_EDITOR
-npm run test:importacao
+git status
+git add README.md docs src public index.html
+git commit -m "Atualiza aplicação e documentação"
+git push origin main
 ```
 
-A carga foi feita em transação. O SQL de reversão está preparado, mas não foi executado. Não use o backup vazio antigo para gerar outra carga sobre os registros já revisados.
+O workflow instala pelo lockfile, executa os testes Vitest/Python, valida a configuração, compila e publica somente **dist/**. Ele não aplica migrações nem altera o banco. Pull requests executam testes/build sem receber os secrets de publicação.
 
-## Publicar no GitHub Pages
+O caminho de produção acompanha o nome do repositório: em `RosanPe/obras2`, usa `/obras2/`. Repositórios `<usuario>.github.io` usam `/`. Para domínio próprio, configure o domínio no Pages e a repository variable `VITE_BASE_PATH=/`.
 
-O workflow está preparado: testes, build validado e publicação de `dist/` a cada push para `main`. O caminho acompanha automaticamente o nome do repositório. Ainda não há commits, remoto nem site publicado.
+`.env.local`, `node_modules`, `dist`, caches, backups e a pasta `base-exemplo/` são ignorados pelo Git. Em upload manual pelo navegador, esses arquivos precisam ser excluídos da seleção: o uploader não aplica o `.gitignore`. Inclua os arquivos ocultos necessários, como `.github/workflows/deploy.yml` e `.nvmrc`.
 
-Siga o [guia de publicação](docs/GITHUB-PAGES.md): crie o repositório, escolha **GitHub Actions** em Settings → Pages, configure `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` nos secrets e envie o código. O guia inclui os comandos Git e o ajuste das URLs de autenticação no Supabase. A configuração segue o [fluxo oficial do Pages](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+O [guia complementar](docs/GITHUB-PAGES.md) detalha o procedimento. O HashRouter mantém as rotas como `/obras2/#/resumo`, sem depender de fallback no servidor.
 
-`.env.local`, backups e a pasta `base-exemplo/` ficam somente no computador, fora do Git. O `.env.example` contém apenas campos vazios. O workflow não altera o banco nem executa importações.
+### Tela branca ou `%BASE_URL%` no endereço do favicon
 
-## Organização
+Se o site publicado ainda contém `%BASE_URL%favicon.svg` ou tenta carregar `/src/main.tsx`, está servindo o HTML fonte, sem o build do Vite.
+
+Confira **Settings → Pages → Source = GitHub Actions** e execute novamente **Verificar e publicar no GitHub Pages** na `main`. A publicação padrão de uma branch com Jekyll pode concorrer com o workflow da aplicação e substituir o site compilado pelo conteúdo da raiz. Aguarde o deploy e recarregue com `Ctrl + Shift + R`.
+
+## Testes e verificações
+
+A suíte cobre geração de sugestões, quantidades de estruturas/postes, máximo dos cabos por regra, listas finais editadas, três operações no mesmo ponto, consolidação, Excel, validações, migração, persistência, permissões e recuperação de senha.
+
+Há três verificações adicionais da carga real que rodam apenas quando existe o arquivo local `base-exemplo/convertida/catalogos-supabase.json`. No CI, esses testes são ignorados; os demais testes usam dados independentes dessa base. O conversor Python também usa dados sintéticos.
+
+A reformulação atual foi verificada com **83 testes Vitest locais**, além do build para Pages. O fluxo no navegador foi conferido em perfil isolado no computador e celular, incluindo arraste com botão direito, I/D/R, edição/exclusão manual, recuperação após reload e conferência do Excel. Os testes de redefinição de senha usam API simulada, sem envio de e-mails ou alteração de senhas reais. Testes de permissão no Supabase foram feitos em transações revertidas.
+
+## Base de exemplo e conversor
+
+A carga inicial trouxe **633 materiais únicos, 483 serviços, 59 estruturas e 65 regras**, com UUIDs v4 novos. Foram preservados 554 itens de estrutura, 97 saídas e 444 alvos de regras; 14 códigos repetidos da origem foram unificados. Essas são contagens históricas da importação, não totais fixos do catálogo atual.
+
+A pasta `base-exemplo/` e os artefatos da carga ficam somente no computador que realizou a importação. O conversor não acessa a rede nem usa senha. Para preparar outra carga, use um backup atualizado e um diretório de saída novo:
+
+```bash
+python3 scripts/converter-base.py \
+  --entrada CAMINHO_DA_BASE.json \
+  --backup CAMINHO_DO_BACKUP_ATUAL.json \
+  --saida DIRETORIO_NOVA_CARGA \
+  --usuario-id UUID_DO_EDITOR
+```
+
+Confira o relatório, os vínculos e o SQL gerado antes de aplicar uma nova importação. Os arquivos locais da carga anterior incluem relatório, mapa de IDs e SQL de reversão; a reversão não foi executada nesta atualização.
+
+## Estrutura do projeto
 
 ```text
-src/dominio/                 tipos e constantes
-src/aplicacao/              motor puro e testes
-src/infraestrutura/local/    IndexedDB e preferências
-src/infraestrutura/supabase/ autenticação e repositórios
-src/infraestrutura/exportacao/ Excel e teste de arquivo
-src/interface/              componentes, páginas e stores
-supabase/schema.sql         tabelas de catálogo e RLS
-docs/ROADMAP.md              próximas etapas e validações pendentes
+src/
+  dominio/                     tipos, constantes e validações
+  aplicacao/                   sugestões, listas finais, resumo e testes
+  infraestrutura/
+    local/                     IndexedDB, migração e preferências
+    supabase/                  Auth, cliente e repositórios
+    exportacao/                Excel e detalhamento por ponto
+  interface/
+    componentes/               croqui, ponto, busca, resumo e editores
+    paginas/                   login, recuperação de senha, cadastros e auditoria
+    store/                     estado e persistência da medição/catálogos
+  estilos/                     estilos e responsividade
+public/                        favicon
+scripts/                       build Pages, diagnóstico e conversor
+supabase/                      schema, migrações e testes de políticas
+.github/workflows/             verificação e publicação
+docs/                          publicação e histórico/pendências
 ```
 
-As listas de cadastros, resumo e auditoria têm rolagem interna. O e-mail do usuário aparece ao lado do botão de tema. Resumos existentes são recalculados ao abrir a aba com os catálogos carregados, incluindo a exportação.
+Frontend: React 18, TypeScript, Vite, Tailwind, componentes shadcn/ui, Zustand, React Hook Form, Zod, TanStack Table, Lucide e Sonner. PDFs: PDF.js, react-zoom-pan-pinch e react-rnd. Persistência local: idb-keyval. Backend: Supabase Auth/Postgres. Exportação: SheetJS.
 
+O [inicio.md](inicio.md) registra o escopo original; decisões posteriores, como catálogos compartilhados, mão de obra unificada, múltiplas pranchas e listas finais por operação, estão refletidas neste README e no código atual.
 
-### Administração e auditoria
+## Pendências e limites conhecidos
 
-A migração [administracao_super.sql](supabase/migrations/20261024_administracao_super.sql) identifica a conta `pedro.hrosan@hotmail.com` pelo UUID no banco e libera a aba Auditoria somente para esse administrador. Editores não podem promover usuários nem consultar contas ou histórico. Pedro pode conceder/revogar edição dos catálogos para usuários já cadastrados. O acesso normal à medição permanece disponível aos demais usuários.
-
-A auditoria reúne todos os registros atuais dos quatro catálogos, composição incluída, além das contas e permissões. O histórico registra criações, edições, exclusões e mudanças de permissão a partir da ativação, com autor, data e dados anteriores/novos. Não há histórico retroativo. PDFs e pontos continuam locais e não são centralizados nesta página. As três listas do resumo e as respectivas abas do Excel começam em ordem alfabética pela descrição.
-
-O teste [administracao.sql](supabase/tests/administracao.sql), executado como postgres em transação revertida, valida acesso super, delegação, revogação, bloqueio de usuários comuns e registro das alterações. Nenhum usuário ou material de teste é mantido.
-
-
-### Link de redefinição de senha
-
-Em **Auditoria → Usuários e permissões**, o administrador super pode clicar em **Redefinir senha** na linha de uma conta e confirmar o destinatário. A aplicação consulta novamente a RPC protegida `admin_listar_usuarios` e usa o e-mail real do registro para solicitar um link ao Supabase Auth. A solicitação não altera a senha nem a sessão do administrador. Usuários comuns não veem essa área.
-
-O usuário abre o e-mail e define sua própria senha na tela **Definir nova senha**, com pelo menos oito caracteres e confirmação. O app trata `PASSWORD_RECOVERY`, mantém a tela após recarregar sua rota `#/redefinir-senha` e mostra erro quando o link é inválido/expirado. Senhas não são guardadas no estado da medição ou enviadas aos catálogos.
-
-Em **Supabase → Authentication → URL Configuration**, a raiz real da aplicação deve estar autorizada em **Redirect URLs**, por exemplo `https://rosanpe.github.io/obras2/`, e configurada como **Site URL**. O código usa automaticamente a origem e o caminho base da página onde o administrador está. Para enviar de localhost, autorize a URL local; para links destinados a usuários do site publicado, use o botão no site publicado. Não é necessária uma chave service_role. A entrega é feita pelo serviço de e-mail configurado no Supabase.
-
-Referências oficiais: [resetPasswordForEmail](https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail), [URLs de redirecionamento](https://supabase.com/docs/guides/auth/redirect-urls).
+- Importação/exportação CSV de catálogos pela interface.
+- Detecção automática de círculos vermelhos e relatório em PDF.
+- Sincronização de obras entre dispositivos e importação de um Excel para retomar o trabalho não estão implementadas.
+- Cache de páginas e outras melhorias de navegação constam no [roadmap](docs/ROADMAP.md).
+- Somente a página atual é renderizada, mas o peso dos PDFs e a memória do dispositivo influenciam a fluidez. O cenário de 10 pranchas e 350 pontos ainda não tem benchmark documentado.

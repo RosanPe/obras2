@@ -1,137 +1,148 @@
 import { describe, expect, it } from 'vitest';
 import { calcularMedicao } from './motor-regras';
-import type { Catalogos, PontoMedicao } from '../dominio/tipos';
+import { atualizarFontes, composicaoVazia, gerarSugestoes, obterOperacoesPonto } from './composicao-ponto';
+import type { Catalogos, ComposicaoOperacao, PontoMedicao } from '../dominio/tipos';
 const catalogos: Catalogos = {
-  materiais: [{ id: 'm1', codigo: '001', descricao: 'Poste', categoria: 'poste' }, { id: 'm2', codigo: '002', descricao: 'Cabo A', categoria: 'cabo' }, { id: 'm3', codigo: '003', descricao: 'Cabo B', categoria: 'cabo' }],
-  maoObra: [{ id: 'mo1', codigo: 'MO-01', descricao: 'Instalar' }],
-  estruturas: [{ id: 'e1', nome: 'N1', itens: [{ material_id: 'm1', quantidade: 2 }] }],
-  regras: [{ id: 'r1', nome: 'Postes', tipo_gatilho: 'contexto', categorias: ['poste'], material_id: null, estrutura_id: null, operacoes: ['I', 'D', 'R'], saidas: [{ mao_obra_id: 'mo1', quantidade: 3 }] }],
+  materiais: [{ id: 'm', codigo: '900', descricao: 'Abraçadeira', categoria: 'geral' }, { id: 'p', codigo: '100', descricao: 'Poste', categoria: 'poste' }, { id: 'c1', codigo: '200', descricao: 'Cabo 2', categoria: 'cabo' }, { id: 'c2', codigo: '201', descricao: 'Cabo 2/0', categoria: 'cabo' }],
+  maoObra: [{ id: 'mo1', codigo: 'MO1', descricao: 'Montar estrutura' }, { id: 'mo2', codigo: 'MO2', descricao: 'Instalar poste' }, { id: 'mo3', codigo: 'MO3', descricao: 'Lançar cabo' }],
+  estruturas: [{ id: 'e1', nome: 'N1', itens: [{ material_id: 'm', quantidade: 3 }] }],
+  regras: [
+    { id: 'r1', nome: 'Estrutura', tipo_gatilho: 'estrutura', categorias: [], material_id: null, estrutura_id: 'e1', operacoes: ['I', 'D', 'R'], saidas: [{ mao_obra_id: 'mo1', quantidade: 2 }] },
+    { id: 'r2', nome: 'Poste', tipo_gatilho: 'material', categorias: [], material_id: 'p', estrutura_id: null, operacoes: ['I', 'D', 'R'], saidas: [{ mao_obra_id: 'mo2', quantidade: 3 }] },
+    { id: 'r3', nome: 'Cabo < 2/0', tipo_gatilho: 'material', categorias: [], material_id: 'c1', material_ids: ['c1', 'c2'], estrutura_id: null, operacoes: ['I', 'D', 'R'], saidas: [{ mao_obra_id: 'mo3', quantidade: 1 }] },
+  ],
 };
-const ponto: PontoMedicao = { id: 'p1', numero: 'P01', pagina: 1, x_percent: .2, y_percent: .3, status: 'validado', operacao: 'I', estrutura_id: 'e1', estruturas_secundarias: [], poste_id: null, cabos_ids: [], metragem_linear: 0, mao_obra_adicional: [] };
-const calcular = (pontos = [ponto], base = catalogos) => calcularMedicao({ ...base, pontos });
-describe('motor de regras', () => {
-  it('expande estrutura e registra os itens por ponto', () => {
-    const resultado = calcular();
-    expect(resultado.materiaisInstalacao[0].quantidade).toBe(2);
-    expect(resultado.porPonto[0]).toMatchObject({ numeroPonto: 'P01', pagina: 1, estrutura: 'N1' });
-    expect(resultado.porPonto[0].itens).toHaveLength(2);
+const ponto: PontoMedicao = { id: 'p1', numero: 'P01', pagina: 1, x_percent: .2, y_percent: .3, status: 'validado', operacao: 'I', estrutura_id: null, estruturas_secundarias: [], poste_id: null, cabos_ids: [], metragem_linear: 0, mao_obra_adicional: [] };
+const fontes = { estruturas: [{ estrutura_id: 'e1', quantidade: 2 }], postes: [{ material_id: 'p', quantidade: 3 }], cabos: [{ material_id: 'c1', quantidade: 50 }, { material_id: 'c2', quantidade: 52 }] };
+const preencher = (op: 'I' | 'D' | 'R' = 'I') => atualizarFontes(catalogos, op, composicaoVazia(), fontes);
+const calcular = (composicao = preencher()) => calcularMedicao({ ...catalogos, pontos: [{ ...ponto, operacoes: { I: composicao } }] });
+describe('composição por operação', () => {
+  it('N1 × 2 multiplica os materiais e a regra; poste × 3 multiplica material e mão de obra', () => {
+    const itens = preencher();
+    expect(itens.materiais).toContainEqual({ material_id: 'm', quantidade: 6 });
+    expect(itens.materiais).toContainEqual({ material_id: 'p', quantidade: 3 });
+    expect(itens.mao_obra).toContainEqual({ mao_obra_id: 'mo1', quantidade: 4 });
+    expect(itens.mao_obra).toContainEqual({ mao_obra_id: 'mo2', quantidade: 9 });
   });
-  it('aplica a metragem a todos os cabos e conta o percurso uma vez', () => {
-    const resultado = calcular([{ ...ponto, estrutura_id: null, cabos_ids: ['m2', 'm3'], metragem_linear: 12.5 }]);
-    expect(resultado.materiaisInstalacao).toMatchObject([{ codigo: '002', unidade: 'm', quantidade: 12.5 }, { codigo: '003', unidade: 'm', quantidade: 12.5 }]);
-    expect(resultado.metragemLinearTotal).toBe(12.5);
-    expect(resultado.porPonto[0].metragemLinear).toBe(12.5);
+  it('mantém dois cabos de 50 e 52 m nos materiais e usa 52 m para a mesma regra', () => {
+    const itens = preencher();
+    expect(itens.materiais).toContainEqual({ material_id: 'c1', quantidade: 50 });
+    expect(itens.materiais).toContainEqual({ material_id: 'c2', quantidade: 52 });
+    expect(itens.mao_obra).toContainEqual({ mao_obra_id: 'mo3', quantidade: 52 });
   });
-  it('mede vários cabos pela categoria e não duplica uma seleção repetida', () => {
-    const base: Catalogos = { ...catalogos, materiais: [...catalogos.materiais, { id: 'm4', codigo: '004', descricao: 'Cabo C', categoria: 'cabo' }] };
-    const resultado = calcular([{ ...ponto, estrutura_id: null, cabos_ids: ['m2', 'm3', 'm4', 'm2'], metragem_linear: 20 }], base);
-    expect(resultado.materiaisInstalacao.map(m => [m.codigo, m.quantidade])).toEqual([['002', 20], ['003', 20], ['004', 20]]);
-    expect(resultado.metragemLinearTotal).toBe(20);
+  it('o máximo é por regra: cabos em regras diferentes mantêm metragens próprias', () => {
+    const base = { ...catalogos, regras: [{ ...catalogos.regras[2], material_ids: ['c1'] }, { ...catalogos.regras[2], id: 'r4', material_id: 'c2', material_ids: ['c2'], saidas: [{ mao_obra_id: 'mo2', quantidade: 2 }] }] };
+    const itens = gerarSugestoes(base, 'I', { ...fontes, estruturas: [], postes: [] });
+    expect(itens.mao_obra).toEqual([{ mao_obra_id: 'mo3', quantidade: 50 }, { mao_obra_id: 'mo2', quantidade: 104 }]);
   });
-  it('rejeita material de outra categoria na lista de cabos', () => {
-    expect(() => calcular([{ ...ponto, cabos_ids: ['m1'], metragem_linear: 10 }])).toThrow('categoria cabo');
+  it('gatilho de material da estrutura usa a quantidade de estruturas, sem contar a composição duas vezes', () => {
+    const base = { ...catalogos, regras: [{ ...catalogos.regras[0], tipo_gatilho: 'material' as const, estrutura_id: null, material_id: 'm' }] };
+    expect(gerarSugestoes(base, 'I', fontes).mao_obra).toEqual([{ mao_obra_id: 'mo1', quantidade: 4 }]);
   });
-  it('aciona regra de contexto uma vez por ponto, sem multiplicar pela metragem', () => {
-    const resultado = calcular([{ ...ponto, poste_id: 'm1', cabos_ids: ['m2'], metragem_linear: 100 }]);
-    expect(resultado.maoObraInstalacao[0].quantidade).toBe(3);
-    expect(resultado.materiaisInstalacao[0].quantidade).toBe(3);
+  it('gatilho de contexto cabo usa a maior metragem e respeita a operação', () => {
+    const base = { ...catalogos, regras: [{ ...catalogos.regras[2], tipo_gatilho: 'contexto' as const, categorias: ['cabo' as const], operacoes: ['D' as const] }] };
+    expect(gerarSugestoes(base, 'I', fontes).mao_obra).toEqual([]);
+    expect(gerarSugestoes(base, 'D', fontes).mao_obra).toEqual([{ mao_obra_id: 'mo3', quantidade: 52 }]);
   });
-  it('consolida duplicados e preserva o detalhamento individual', () => {
-    const resultado = calcular([ponto, { ...ponto, id: 'p2', numero: 'P02' }]);
+  it('mantém ajustes e exclusões manuais ao alterar fontes e recalcula somente linhas ainda automáticas', () => {
+    const original = preencher();
+    const editada = { ...original, materiais: original.materiais.map(i => i.material_id === 'm' ? { ...i, quantidade: 99 } : i), mao_obra: original.mao_obra.filter(i => i.mao_obra_id !== 'mo1') };
+    const nova = atualizarFontes(catalogos, 'I', editada, { ...fontes, estruturas: [{ estrutura_id: 'e1', quantidade: 4 }], postes: [{ material_id: 'p', quantidade: 5 }] });
+    expect(nova.materiais.find(i => i.material_id === 'm')?.quantidade).toBe(99);
+    expect(nova.materiais.find(i => i.material_id === 'p')?.quantidade).toBe(5);
+    expect(nova.mao_obra.some(i => i.mao_obra_id === 'mo1')).toBe(false);
+    expect(nova.mao_obra.find(i => i.mao_obra_id === 'mo2')?.quantidade).toBe(15);
+  });
+  it('retirar uma fonte remove seus itens automáticos e conserva materiais manuais', () => {
+    const inicial = preencher();
+    const editada = { ...inicial, materiais: [...inicial.materiais, { material_id: 'avulso', quantidade: 2 }] };
+    const nova = atualizarFontes(catalogos, 'I', editada, { estruturas: [], postes: [], cabos: [] });
+    expect(nova.materiais).toEqual([{ material_id: 'avulso', quantidade: 2 }]);
+    expect(nova.mao_obra).toEqual([]);
+  });
+  it('agrega a mesma saída de regras distintas e expande cada estrutura uma vez por seleção', () => {
+    const base = { ...catalogos, estruturas: [...catalogos.estruturas, { ...catalogos.estruturas[0], id: 'e2', nome: 'N2' }], regras: [{ ...catalogos.regras[0], estrutura_ids: ['e1', 'e2'] }] };
+    const itens = gerarSugestoes(base, 'I', { estruturas: [{ estrutura_id: 'e1', quantidade: 2 }, { estrutura_id: 'e2', quantidade: 3 }], postes: [], cabos: [] });
+    expect(itens.materiais).toEqual([{ material_id: 'm', quantidade: 15 }]);
+    expect(itens.mao_obra).toEqual([{ mao_obra_id: 'mo1', quantidade: 10 }]);
+  });
+  it('rejeita referências ausentes, categoria errada e quantidades inválidas', () => {
+    expect(() => gerarSugestoes(catalogos, 'I', { ...fontes, estruturas: [{ estrutura_id: 'falta', quantidade: 1 }] })).toThrow('Estrutura');
+    expect(() => gerarSugestoes(catalogos, 'I', { ...fontes, cabos: [{ material_id: 'p', quantidade: 2 }] })).toThrow('categoria cabo');
+    for (const quantidade of [0, -1, NaN, Infinity]) expect(() => gerarSugestoes(catalogos, 'I', { ...fontes, postes: [{ material_id: 'p', quantidade }] })).toThrow('Quantidade');
+  });
+});
+describe('resumo das listas finais', () => {
+  it('lê exatamente os ajustes finais, sem reconstruir materiais ou regras', () => {
+    const editada = { ...preencher(), materiais: [{ material_id: 'm', quantidade: 7 }], mao_obra: [{ mao_obra_id: 'mo1', quantidade: 8 }] };
+    const resultado = calcular(editada);
+    expect(resultado.materiaisInstalacao).toMatchObject([{ codigo: '900', quantidade: 7 }]);
+    expect(resultado.maoObraInstalacao).toMatchObject([{ codigo: 'MO1', quantidade: 8 }]);
     expect(resultado.materiaisInstalacao).toHaveLength(1);
-    expect(resultado.materiaisInstalacao[0].quantidade).toBe(4);
+    expect(resultado.maoObraInstalacao).toHaveLength(1);
+  });
+  it('permite I, D e R no mesmo ponto, mantendo cada operação e origem no detalhamento', () => {
+    const resultado = calcularMedicao({ ...catalogos, pranchas: [{ id: 'pdf', nome: 'Projeto.pdf' }], pontos: [{ ...ponto, prancha_id: 'pdf', operacoes: { I: preencher('I'), D: preencher('D'), R: preencher('R') } }] });
+    expect(resultado.porPonto.map(p => [p.numeroPonto, p.operacao, p.prancha])).toEqual([['P01', 'I', '1 · Projeto.pdf'], ['P01', 'D', '1 · Projeto.pdf'], ['P01', 'R', '1 · Projeto.pdf']]);
+    expect(resultado.materiaisInstalacao.find(m => m.codigo === '900')?.quantidade).toBe(6);
+    expect(resultado.materiaisDesativacao.find(m => m.codigo === '900')?.quantidade).toBe(6);
+    expect(resultado.maoObraReinstalacao.find(m => m.codigo === 'MO3')?.quantidade).toBe(52);
+    expect(resultado.porPonto[2].itens.some(i => i.tipo === 'material')).toBe(false);
+    expect(resultado.materiaisReinstalacao).toEqual([]);
+  });
+  it('soma entre pranchas, preserva casas decimais e ignora pontos pendentes', () => {
+    const c: ComposicaoOperacao = { ...composicaoVazia(), materiais: [{ material_id: 'c1', quantidade: .1 }] };
+    const pontos = [{ ...ponto, prancha_id: 'pdf1', operacoes: { I: c } }, { ...ponto, id: 'p2', numero: 'P02', prancha_id: 'pdf2', operacoes: { I: { ...c, materiais: [{ material_id: 'c1', quantidade: .2 }] } } }, { ...ponto, id: 'p3', status: 'pendente' as const, operacoes: { I: preencher() } }];
+    const resultado = calcularMedicao({ ...catalogos, pontos });
+    expect(resultado.materiaisInstalacao[0].quantidade).toBe(.3);
+    expect(resultado.metragemLinearTotal).toBe(.3);
     expect(resultado.porPonto).toHaveLength(2);
   });
-  it('separa desativação e reinstalação sem contabilizar materiais em R', () => {
-    const resultado = calcular([{ ...ponto, operacao: 'D' }, { ...ponto, id: 'p2', operacao: 'R' }]);
-    expect(resultado.materiaisDesativacao[0].quantidade).toBe(2);
-    expect(resultado.materiaisInstalacao).toEqual([]);
-    expect(resultado.maoObraDesativacao[0].quantidade).toBe(3);
-    expect(resultado.maoObraReinstalacao[0].quantidade).toBe(3);
-    expect(resultado.porPonto[1].itens.every(item => item.tipo === 'mao_obra')).toBe(true);
+  it('não recria um serviço removido e não muda a medição quando o catálogo de regras é editado', () => {
+    const operacoes = { I: { ...preencher(), mao_obra: [] } };
+    const antes = JSON.stringify(operacoes);
+    const resultado = calcularMedicao({ ...catalogos, regras: [], estruturas: [], pontos: [{ ...ponto, operacoes }] });
+    expect(resultado.maoObraInstalacao).toEqual([]);
+    expect(JSON.stringify(operacoes)).toBe(antes);
   });
-  it('ignora pontos pendentes', () => expect(calcular([{ ...ponto, status: 'pendente' }]).porPonto).toEqual([]));
-  it('respeita gatilhos de material, estrutura e operação', () => {
-    const base: Catalogos = { ...catalogos, regras: ['material', 'estrutura'].map((tipo, i) => ({ ...catalogos.regras[0], id: String(i), tipo_gatilho: tipo as 'material' | 'estrutura', material_id: 'm1', estrutura_id: 'e1', operacoes: ['I'] })) };
-    expect(calcular([ponto], base).maoObraInstalacao[0].quantidade).toBe(6);
-    expect(calcular([{ ...ponto, operacao: 'D' }], base).maoObraDesativacao).toEqual([]);
+  it('rejeita itens finais ausentes ou com quantidade inválida', () => {
+    expect(() => calcular({ ...preencher(), materiais: [{ material_id: 'ausente', quantidade: 1 }] })).toThrow('Material');
+    expect(() => calcular({ ...preencher(), mao_obra: [{ mao_obra_id: 'ausente', quantidade: 1 }] })).toThrow('Mão de obra');
+    expect(() => calcular({ ...preencher(), materiais: [{ material_id: 'm', quantidade: -1 }] })).toThrow('Quantidade');
   });
-  it('não altera a entrada e rejeita referências ausentes', () => {
-    const antes = JSON.stringify(catalogos);
-    calcular();
-    expect(JSON.stringify(catalogos)).toBe(antes);
-    expect(() => calcular([{ ...ponto, poste_id: 'inexistente' }])).toThrow('Material não encontrado');
+  it('migra as seleções antigas para sua aba e preserva materiais e serviços avulsos', () => {
+    const antiga = { ...ponto, operacao: 'D' as const, estrutura_id: 'e1', poste_id: 'p', cabos_ids: ['c1', 'c2'], metragem_linear: 50, materiais_adicionais: [{ material_id: 'm', quantidade: 2 }], mao_obra_adicional: [{ mao_obra_id: 'mo1', quantidade: 1 }] };
+    const op = obterOperacoesPonto(antiga, catalogos);
+    expect(Object.keys(op)).toEqual(['D']);
+    expect(op.D?.materiais).toContainEqual({ material_id: 'm', quantidade: 5 });
+    expect(op.D?.mao_obra).toContainEqual({ mao_obra_id: 'mo1', quantidade: 3 });
+    expect(op.D?.mao_obra).toContainEqual({ mao_obra_id: 'mo3', quantidade: 50 });
   });
-  it('soma as metragens do mesmo cabo entre pontos sem erro decimal', () => {
-    const resultado = calcular([.1, .2].map((metros, i) => ({ ...ponto, id: String(i), numero: `P${i}`, estrutura_id: null, cabos_ids: ['m2'], metragem_linear: metros })));
-    expect(resultado.materiaisInstalacao[0]).toMatchObject({ quantidade: .3, unidade: 'm' });
-    expect(resultado.porPonto.map(p => p.itens[0].quantidade)).toEqual([.1, .2]);
+  it('abre rascunho antigo incompleto sem perder a seleção que precisa de correção', () => {
+    const op = obterOperacoesPonto({ ...ponto, status: 'pendente', cabos_ids: ['c1'], metragem_linear: 0 }, catalogos);
+    expect(op.I?.cabos).toEqual([{ material_id: 'c1', quantidade: 0 }]);
   });
-  it('soma o percurso uma vez por ponto, mesmo com dois tipos de cabo, e ignora rascunhos', () => {
-    const pontos = [25, 10.5].map((metros, i) => ({ ...ponto, id: String(i), numero: `P${i}`, cabos_ids: ['m2', 'm3'], metragem_linear: metros }));
-    const resultado = calcular([...pontos, { ...pontos[0], id: 'rascunho', status: 'pendente', metragem_linear: 999 }]);
-    expect(resultado.metragemLinearTotal).toBe(35.5);
-    expect(resultado.materiaisInstalacao.filter(m => m.unidade === 'm').map(m => m.quantidade)).toEqual([35.5, 35.5]);
-  });
-  it('adiciona várias estruturas e evita duplicar o mesmo vínculo', () => {
-    const base = { ...catalogos, estruturas: [...catalogos.estruturas, { id: 'e2', nome: 'N2', itens: [{ material_id: 'm1', quantidade: 4 }] }] };
-    const resultado = calcular([{ ...ponto, estruturas_secundarias: ['e1', 'e2'] }], base);
-    expect(resultado.materiaisInstalacao[0].quantidade).toBe(6);
-    expect(resultado.porPonto[0].estrutura).toBe('N1, N2');
-  });
-  it('soma mão de obra manual à automática e preserva os itens por ponto', () => {
-    const resultado = calcular([{ ...ponto, mao_obra_adicional: [{ mao_obra_id: 'mo1', quantidade: 2.5 }] }]);
-    expect(resultado.maoObraInstalacao[0].quantidade).toBe(5.5);
-    expect(resultado.porPonto[0].itens.filter(i => i.tipo === 'mao_obra').map(i => i.quantidade)).toEqual([3, 2.5]);
-  });
-  it('uma regra com alvos mistos usa os metros do cabo correspondente', () => {
-    const base: Catalogos = { ...catalogos, regras: [{ ...catalogos.regras[0], tipo_gatilho: 'material', material_id: 'm1', material_ids: ['m1', 'm2'] }] };
-    expect(calcular([{ ...ponto, cabos_ids: ['m2'], metragem_linear: 25 }], base).maoObraInstalacao[0].quantidade).toBe(75);
-    expect(calcular([{ ...ponto, estrutura_id: null, cabos_ids: ['m2'], metragem_linear: 25 }], base).maoObraInstalacao[0].quantidade).toBe(75);
-  });
-  it.each(['I', 'D', 'R'] as const)('mede a mão de obra de cabo pela metragem em %s e soma entre pontos', operacao => {
-    const base: Catalogos = { ...catalogos, regras: [{ ...catalogos.regras[0], tipo_gatilho: 'material', material_id: 'm2', material_ids: ['m2'], saidas: [{ mao_obra_id: 'mo1', quantidade: 1.5 }] }] };
-    const resultado = calcular([10, 2.5].map((metros, i) => ({ ...ponto, id: String(i), estrutura_id: null, operacao, cabos_ids: ['m2', 'm3'], metragem_linear: metros })), base);
-    const chave = operacao === 'I' ? 'maoObraInstalacao' : operacao === 'D' ? 'maoObraDesativacao' : 'maoObraReinstalacao';
-    expect(resultado[chave][0].quantidade).toBe(18.75);
-    expect(resultado.porPonto.map(p => p.itens.filter(i => i.tipo === 'mao_obra')[0].quantidade)).toEqual([15, 3.75]);
-  });
-  it.each(['material', 'contexto'] as const)('soma os metros de todos os cabos correspondentes no gatilho %s sem repetir IDs', tipo_gatilho => {
-    const base: Catalogos = { ...catalogos, regras: [{ ...catalogos.regras[0], tipo_gatilho, categorias: ['cabo'], material_id: 'm2', material_ids: ['m2', 'm3', 'm2'], saidas: [{ mao_obra_id: 'mo1', quantidade: 1 }] }] };
-    expect(calcular([{ ...ponto, estrutura_id: null, cabos_ids: ['m2', 'm3', 'm2'], metragem_linear: 25 }], base).maoObraInstalacao[0].quantidade).toBe(50);
-  });
-  it.each(['I', 'D', 'R'] as const)('mede mão de obra avulsa em %s, mesmo sem materiais', operacao => {
-    const resultado = calcular([{ ...ponto, estrutura_id: null, operacao, mao_obra_adicional: [{ mao_obra_id: 'mo1', quantidade: 2 }] }]);
-    const chave = operacao === 'I' ? 'maoObraInstalacao' : operacao === 'D' ? 'maoObraDesativacao' : 'maoObraReinstalacao';
-    expect(resultado[chave][0]).toMatchObject({ codigo: 'MO-01', quantidade: 2, unidade: 'SV' });
-    expect(resultado.porPonto[0].itens).toHaveLength(1);
-  });
-  it('não ignora serviço adicional removido do catálogo', () => expect(() => calcular([{ ...ponto, mao_obra_adicional: [{ mao_obra_id: 'ausente', quantidade: 2 }] }])).toThrow('Mão de obra não encontrada'));
-  it('soma materiais avulsos à estrutura e usa os itens como gatilho de mão de obra', () => {
-    const resultado = calcular([{ ...ponto, materiais_adicionais: [{ material_id: 'm1', quantidade: 4 }] }]);
-    expect(resultado.materiaisInstalacao[0].quantidade).toBe(6);
-    expect(resultado.maoObraInstalacao[0].quantidade).toBe(3);
-    expect(resultado.porPonto[0].itens.filter(i => i.tipo === 'material').map(i => i.quantidade)).toEqual([2, 4]);
-  });
-  it('mede material avulso em desativação e somente sua mão de obra em reinstalação', () => {
-    const resultado = calcular((['D', 'R'] as const).map((operacao, i) => ({ ...ponto, id: String(i), estrutura_id: null, operacao, materiais_adicionais: [{ material_id: 'm1', quantidade: 2 }] })));
-    expect(resultado.materiaisDesativacao[0].quantidade).toBe(2);
-    expect(resultado.maoObraReinstalacao[0].quantidade).toBe(3);
-    expect(resultado.porPonto[1].itens.every(i => i.tipo === 'mao_obra')).toBe(true);
-  });
-  it('consolida todas as pranchas e páginas preservando a origem no detalhamento', () => {
-    const pontos = ['a', 'b'].flatMap((prancha_id, i) => [1, 2].map(pagina => ({ ...ponto, id: `${i}-${pagina}`, numero: `P${i}-${pagina}`, prancha_id, pagina, materiais_adicionais: [{ material_id: 'm1', quantidade: 1 }] })));
-    const resultado = calcularMedicao({ ...catalogos, pontos, pranchas: [{ id: 'a', nome: 'projeto.pdf' }, { id: 'b', nome: 'projeto.pdf' }] });
-    expect(resultado.materiaisInstalacao[0].quantidade).toBe(12);
-    expect(resultado.maoObraInstalacao[0].quantidade).toBe(12);
-    expect(resultado.porPonto.map(p => [p.prancha, p.pagina])).toEqual([['1 · projeto.pdf', 1], ['1 · projeto.pdf', 2], ['2 · projeto.pdf', 1], ['2 · projeto.pdf', 2]]);
-  });
-  it('rejeita material avulso ausente e quantidade inválida', () => {
-    expect(() => calcular([{ ...ponto, materiais_adicionais: [{ material_id: 'ausente', quantidade: 1 }] }])).toThrow('Material não encontrado');
-    expect(() => calcular([{ ...ponto, materiais_adicionais: [{ material_id: 'm1', quantidade: 0 }] }])).toThrow('Quantidade');
-  });
-  it('rejeita metragens e quantidades de serviço inválidas', () => {
-    expect(() => calcular([{ ...ponto, cabos_ids: ['m2'], metragem_linear: 0 }])).toThrow('Quantidade');
-    expect(() => calcular([{ ...ponto, mao_obra_adicional: [{ mao_obra_id: 'mo1', quantidade: -1 }] }])).toThrow('Quantidade');
-  });
+});
+
+it('em reinstalação só sugere mão de obra e aceita material apenas incluído manualmente', () => {
+  const r = preencher('R');
+  expect(r.materiais).toEqual([]);
+  expect(r.base.materiais).toEqual([]);
+  expect(r.mao_obra.find(i => i.mao_obra_id === 'mo3')?.quantidade).toBe(52);
+  const comMaterial = { ...r, materiais: [{ material_id: 'm', quantidade: 2 }] };
+  const resultado = calcularMedicao({ ...catalogos, pontos: [{ ...ponto, operacoes: { R: comMaterial } }] });
+  expect(resultado.materiaisInstalacao).toEqual([]);
+  expect(resultado.materiaisDesativacao).toEqual([]);
+  expect(resultado.materiaisReinstalacao).toMatchObject([{ codigo: '900', quantidade: 2 }]);
+});
+it('regra de cabo usa o máximo dos metros medidos mesmo quando há cabo na composição de uma estrutura', () => {
+  const base = { ...catalogos, estruturas: [{ ...catalogos.estruturas[0], itens: [{ material_id: 'c1', quantidade: 30 }] }] };
+  const gerado = gerarSugestoes(base, 'I', { estruturas: [{ estrutura_id: 'e1', quantidade: 2 }], postes: [], cabos: [{ material_id: 'c2', quantidade: 52 }] });
+  expect(gerado.mao_obra.find(i => i.mao_obra_id === 'mo3')?.quantidade).toBe(60);
+});
+it('migra mão de obra de regras acionadas somente por materiais avulsos antigos', () => {
+  const base = { ...catalogos, regras: [{ ...catalogos.regras[1], material_id: 'm' }] };
+  const op = obterOperacoesPonto({ ...ponto, materiais_adicionais: [{ material_id: 'm', quantidade: 5 }] }, base);
+  expect(op.I?.materiais).toEqual([{ material_id: 'm', quantidade: 5 }]);
+  expect(op.I?.mao_obra).toEqual([{ mao_obra_id: 'mo2', quantidade: 3 }]);
 });

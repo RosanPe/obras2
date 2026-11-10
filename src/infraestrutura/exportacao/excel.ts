@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
-import { ABAS_RESULTADO } from '../../dominio/constantes';
+import { obterAbasResultado } from '../../dominio/constantes';
 import { obterResumoObra } from '../../aplicacao/resumo-obra';
 import type { ResultadoMedicao, ResultadoPorPonto } from '../../dominio/tipos';
 export function linhasPorPonto(pontos: ResultadoPorPonto[]) {
@@ -21,7 +21,7 @@ function adicionarAba(livro: XLSX.WorkBook, nome: string, linhas: object[], cabe
 export function criarExcel(resultado: ResultadoMedicao) {
   const livro = XLSX.utils.book_new();
   const resumo = obterResumoObra(resultado);
-  for (const [chave, nome] of ABAS_RESULTADO) adicionarAba(livro, nome, resumo[chave].map(linha => ({ Código: linha.codigo, Descrição: linha.descricao, Unidade: linha.unidade, Quantidade: linha.quantidade })), ['Código', 'Descrição', 'Unidade', 'Quantidade']);
+  for (const [chave, nome] of obterAbasResultado(resultado)) adicionarAba(livro, nome, resumo[chave].map(linha => ({ Código: linha.codigo, Descrição: linha.descricao, Unidade: linha.unidade, Quantidade: linha.quantidade })), ['Código', 'Descrição', 'Unidade', 'Quantidade']);
   adicionarPontos(livro, resultado.porPonto);
   return livro;
 }

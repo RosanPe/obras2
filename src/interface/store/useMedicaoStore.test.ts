@@ -71,3 +71,14 @@ it('reset aguarda salvamentos anteriores e não restaura pontos já apagados', a
   expect(store().pontos).toEqual([]);
   expect(store().pranchas).toEqual([]);
 });
+it('converte seleções antigas para listas finais apenas uma vez e preserva ajustes salvos', async () => {
+  await store().adicionarPdfs([{ nome: 'a', pdf: new Blob() }]);
+  await store().salvarPonto(ponto);
+  const catalogos = { materiais: [{ id: 'm', codigo: 'M1', descricao: 'Material', categoria: 'geral' as const }], maoObra: [], estruturas: [], regras: [] };
+  await store().atualizarModeloPontos(catalogos);
+  expect(store().pontos[0].operacoes?.I?.materiais).toEqual([{ material_id: 'm', quantidade: 2 }]);
+  const atual = store().pontos[0];
+  await store().salvarPonto({ ...atual, operacoes: { I: { ...atual.operacoes!.I!, materiais: [{ material_id: 'm', quantidade: 99 }] } } });
+  await store().atualizarModeloPontos(catalogos);
+  expect(store().pontos[0].operacoes?.I?.materiais[0].quantidade).toBe(99);
+});

@@ -59,3 +59,15 @@ it('exporta a origem das pranchas sem misturar as páginas de PDFs diferentes', 
   expect(linhas.map(l => [l.Prancha, l.Página, l.Quantidade])).toEqual([['1 · A.pdf', 1, 2], ['2 · B.pdf', 1, 2]]);
   expect(livro.Sheets['Materiais Instalação'].D2.v).toBe(4);
 });
+it('exporta listas finais editadas das três operações sem recalcular regras', async () => {
+  const { composicaoVazia } = await import('../../aplicacao/composicao-ponto');
+  const c = { ...composicaoVazia(), materiais: [{ material_id: 'm', quantidade: 7 }], mao_obra: [{ mao_obra_id: 'mo', quantidade: 5 }] };
+  const ponto: PontoMedicao = { id: 'a', numero: 'P01', pagina: 1, x_percent: .5, y_percent: .5, status: 'validado', operacao: 'I', estrutura_id: null, estruturas_secundarias: [], poste_id: null, cabos_ids: [], metragem_linear: 0, mao_obra_adicional: [], operacoes: { I: c, D: { ...c, materiais: [{ material_id: 'm', quantidade: 2 }] }, R: c } };
+  const resultado = calcularMedicao({ materiais: [{ id: 'm', codigo: '001', descricao: 'Material', categoria: 'geral' }], maoObra: [{ id: 'mo', codigo: 'MO1', descricao: 'Serviço' }], estruturas: [], regras: [], pontos: [ponto] });
+  const livro = XLSX.read(XLSX.write(criarExcel(resultado), { type: 'array', bookType: 'xlsx' }));
+  expect(livro.Sheets['Materiais Instalação'].D2.v).toBe(7);
+  expect(livro.Sheets['Materiais Desativação'].D2.v).toBe(2);
+  expect(livro.Sheets['Mão de Obra'].D2.v).toBe(15);
+  expect(livro.Sheets['Materiais Reinstalação'].D2.v).toBe(7);
+  expect(XLSX.utils.sheet_to_json<Record<string, unknown>>(livro.Sheets['Por Ponto']).map(p => p.Operação)).toEqual(['I', 'I', 'D', 'D', 'R', 'R']);
+});

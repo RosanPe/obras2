@@ -12,7 +12,7 @@ export function PontoMarker({ ponto, zoom, pagina, editar, selecionado }: { pont
   return <button type="button" className={`marker ${ponto.status} ${selecionado ? 'editing' : ''}`} style={{ left: `${local.x_percent * 100}%`, top: `${local.y_percent * 100}%`, transform: `translate(-50%, -50%) scale(${1 / zoom})`, touchAction: 'none' }} title={`${ponto.numero} · ${ponto.status} · arraste para mover`} aria-label={`Editar ${ponto.numero}, ${ponto.status}`} onClick={e => {
     e.stopPropagation(); if (!suprimirClique.current) editar(ponto); suprimirClique.current = false;
   }} onPointerDown={e => {
-    e.stopPropagation(); if (e.button !== 0) return;
+    if (e.button !== 0) return; e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId); gesto.current = { x: e.clientX, y: e.clientY, moveu: false }; suprimirClique.current = false;
   }} onPointerMove={e => {
     const inicio = gesto.current; if (!inicio || !pagina.current) return;
