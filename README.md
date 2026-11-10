@@ -297,7 +297,7 @@ O [guia complementar](docs/GITHUB-PAGES.md) detalha o procedimento. O HashRouter
 
 Se o site publicado ainda contém `%BASE_URL%favicon.svg` ou tenta carregar `/src/main.tsx`, está servindo o HTML fonte, sem o build do Vite.
 
-Confira **Settings → Pages → Source = GitHub Actions** e execute novamente **Verificar e publicar no GitHub Pages** na `main`. A publicação padrão de uma branch com Jekyll pode concorrer com o workflow da aplicação e substituir o site compilado pelo conteúdo da raiz. Aguarde o deploy e recarregue com `Ctrl + Shift + R`.
+O workflow verifica a origem do Pages e interrompe com uma mensagem clara se ela ainda estiver em publicação por branch. Essa verificação não altera configurações administrativas. Confira **Settings → Pages → Source = GitHub Actions** e execute novamente **Verificar e publicar no GitHub Pages** na `main`. A publicação padrão de uma branch com Jekyll pode concorrer com o workflow da aplicação e substituir o site compilado pelo conteúdo da raiz. Aguarde o deploy e recarregue com `Ctrl + Shift + R`.
 
 ## Testes e verificações
 
@@ -305,7 +305,7 @@ A suíte cobre geração de sugestões, quantidades de estruturas/postes, máxim
 
 Há três verificações adicionais da carga real que rodam apenas quando existe o arquivo local `base-exemplo/convertida/catalogos-supabase.json`. No CI, esses testes são ignorados; os demais testes usam dados independentes dessa base. O conversor Python também usa dados sintéticos.
 
-A reformulação atual foi verificada com **83 testes Vitest locais**, além do build para Pages. O fluxo no navegador foi conferido em perfil isolado no computador e celular, incluindo arraste com botão direito, I/D/R, edição/exclusão manual, recuperação após reload e conferência do Excel. Os testes de redefinição de senha usam API simulada, sem envio de e-mails ou alteração de senhas reais. Testes de permissão no Supabase foram feitos em transações revertidas.
+A reformulação atual foi verificada com **87 testes Vitest locais**, além do build para Pages. O fluxo no navegador foi conferido em perfil isolado no computador e celular, incluindo arraste com botão direito, I/D/R, edição/exclusão manual, recuperação após reload e conferência do Excel. Os testes de redefinição de senha usam API simulada, sem envio de e-mails ou alteração de senhas reais. Testes de permissão no Supabase foram feitos em transações revertidas.
 
 ## Base de exemplo e conversor
 

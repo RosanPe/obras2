@@ -88,3 +88,5 @@ Referências: [deploy do Vite](https://vite.dev/guide/static-deploy#github-pages
 ## Diagnóstico de tela branca
 
 Se o HTML publicado contém `%BASE_URL%` ou `/src/main.tsx`, a raiz do código-fonte foi publicada sem o build do Vite. Confira **Settings → Pages → Source = GitHub Actions** e execute novamente o workflow **Verificar e publicar no GitHub Pages** na `main`. Evite a publicação concorrente da branch pelo fluxo padrão Jekyll. O site precisa usar o artefato `dist/` gerado pelo workflow da aplicação.
+
+O workflow verifica a origem do Pages antes de compilar: se ainda estiver em publicação por branch (`legacy`), ele interrompe com o link de Settings → Pages. Essa verificação consulta a configuração com `pages: read`; não altera as configurações administrativas. Após selecionar GitHub Actions, execute o workflow novamente.

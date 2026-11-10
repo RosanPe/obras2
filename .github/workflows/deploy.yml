@@ -15,6 +15,9 @@ concurrency:
 
 jobs:
   build:
+    permissions:
+      contents: read
+      pages: read
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -25,6 +28,11 @@ jobs:
         with:
           node-version-file: .nvmrc
           cache: npm
+      - name: Validar origem do GitHub Pages
+        if: github.event_name != 'pull_request'
+        run: node scripts/verificar-pages.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Instalar dependências
         run: npm ci
       - name: Testar aplicação

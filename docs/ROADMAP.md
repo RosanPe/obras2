@@ -133,3 +133,11 @@ Detecção automática de círculos e relatório PDF permanecem opcionais de fas
 - Correção do observador de sessão para não limpar/recarregar os catálogos a cada troca de rota.
 
 - Validação da reformulação: 83 testes Vitest, incluindo substituição dos cenários antigos pelas novas regras. Navegador verificou quantidades finais, I/D/R, cabos 50/52, exclusões, reinstalação sem materiais automáticos, Excel e recarga sem recalcular regras, em desktop/mobile sem erros JS.
+
+
+## Verificação de origem do Pages — 09/11/2026
+
+- Recorrência confirmada: o deploy Vite do commit 71814df concluiu antes do Jekyll automático, que publicou HTML fonte com /src/main.tsx e %BASE_URL%.
+- Workflow agora consulta a configuração do Pages com permissão de leitura e bloqueia origem legacy, mostrando o link correto para selecionar GitHub Actions.
+- A alteração administrativa de Source precisa ser feita pelo responsável no painel; o token padrão do Actions não tem permissão de administração.
+- 87 testes Vitest locais aprovados, incluindo a detecção da configuração incorreta.
