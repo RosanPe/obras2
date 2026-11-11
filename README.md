@@ -143,7 +143,7 @@ A busca combina código, descrição e nome, sem depender de acentos, caixa ou o
 - **Estrutura N1 × 2:** multiplica por 2 os materiais da composição e as quantidades de saída das regras correspondentes.
 - **Poste × 3:** gera 3 unidades do material e multiplica por 3 a saída da regra correspondente.
 - Se vários componentes da mesma estrutura correspondem à mesma regra, a estrutura contribui uma vez pela quantidade selecionada, evitando repetição por vínculos alternativos.
-- Regras podem usar material, estrutura ou contexto/categoria como gatilho e restringir as operações I/D/R.
+- Regras podem usar material, estrutura ou contexto/categoria como gatilho e têm listas de mão de obra próprias para cada operação.
 
 ### Cabos e maior metragem por regra
 
@@ -204,6 +204,15 @@ A reformulação dos pontos usa a versão local 6 e não exige mudança no banco
 
 A aba **Cadastros** permite consultar materiais, mão de obra, estruturas e regras. Usuários autorizados também podem criar, editar e excluir registros. Estruturas e regras têm editores de composição com busca; são salvas por RPCs transacionais.
 
+### Criar ou editar uma regra por operação
+
+1. Em **Cadastros → Regras**, clique em **Novo cadastro** ou em **Editar** na linha da regra.
+2. Informe o nome e escolha o gatilho. Para uma regra de N1, selecione **Estrutura** e adicione **N1**.
+3. Nas abas **Instalado**, **Desativado** e **Reinstalado**, busque os serviços e informe suas quantidades. O mesmo serviço pode ter uma quantidade diferente em cada aba. Abas vazias ficam fora da regra.
+4. Clique em **Salvar cadastro**. Ao selecionar N1 em um ponto, a aplicação usa os serviços e as quantidades da operação correspondente.
+
+Ao editar uma regra antiga, os serviços compartilhados aparecem nas abas das operações em que já eram usados. Você pode ajustar cada aba separadamente.
+
 | Perfil | Permissões |
 | --- | --- |
 | Usuário autenticado comum | Consultar catálogos, marcar pontos, medir e exportar |
@@ -232,7 +241,7 @@ O destinatário abre o link recebido e preenche **Nova senha** e **Confirmar nov
 
 ### Banco existente deste projeto
 
-O banco utilizado no desenvolvimento já recebeu o schema, as migrações e a carga inicial. Para usar esse mesmo banco, configure a URL e a chave pública; não reaplique o schema ou a importação sobre os registros existentes.
+O banco deste projeto já recebeu o schema, a carga inicial e a [migração de regras por operação](supabase/migrations/20261110_regras_por_operacao.sql). Para usar esse banco no ambiente local, configure a URL e a chave pública em `.env.local`. Em outra instância já configurada, aplique a migração de regras por operação se ela ainda estiver pendente.
 
 O registro do MCP do Supabase no Codex não preenche `.env.local`. O frontend precisa da sua própria URL/chave pública.
 
@@ -247,6 +256,7 @@ Execute no SQL Editor, como administrador e nesta ordem:
 5. [categoria_cabo_unica.sql](supabase/migrations/20261024_categoria_cabo_unica.sql): cadastro de cabos somente por categoria, sem exigir BT/MT.
 6. Crie a conta master `pedro.hrosan@hotmail.com` no Supabase Auth, pelo cadastro da aplicação ou pelo painel. Confirme o e-mail quando essa opção estiver habilitada.
 7. [administracao_super.sql](supabase/migrations/20261024_administracao_super.sql): administrador, auditoria e RPCs de gestão. Essa migração exige que a conta master já exista.
+8. [regras_por_operacao.sql](supabase/migrations/20261110_regras_por_operacao.sql) habilita a gravação de serviços e quantidades por operação.
 
 As migrações são scripts de evolução do schema e não devem ser reaplicadas indiscriminadamente. A coluna histórica `tipo_cabo` permanece no banco para compatibilidade da carga antiga, mas não é exigida nem consultada pelo aplicativo.
 

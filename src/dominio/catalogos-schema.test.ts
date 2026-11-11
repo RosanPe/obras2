@@ -19,5 +19,12 @@ describe('validação de catálogos', () => {
     expect(regraFormularioSchema.safeParse({ ...regra, operacoes: [] }).success).toBe(false);
     expect(regraFormularioSchema.safeParse({ ...regra, saidas: [] }).success).toBe(false);
     expect(regraSchema.safeParse({ ...regra, id }).success).toBe(true);
+
+    const saidas = [
+      { mao_obra_id: id, quantidade: 2, operacao: 'I' },
+      { mao_obra_id: id, quantidade: 1, operacao: 'R' },
+    ];
+    expect(regraSchema.parse({ ...regra, id, operacoes: ['I', 'R'], saidas }).saidas).toEqual(saidas);
+    expect(regraSchema.safeParse({ ...regra, id, saidas: [{ ...saidas[0], operacao: 'X' }] }).success).toBe(false);
   });
 });

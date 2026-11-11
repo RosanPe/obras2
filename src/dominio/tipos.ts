@@ -3,7 +3,7 @@ export type Categoria = 'cabo' | 'poste' | 'geral';
 export interface Material { id: string; codigo: string; descricao: string; categoria: Categoria }
 export interface MaoObra { id: string; codigo: string; descricao: string }
 export interface Estrutura { id: string; nome: string; itens: { material_id: string; quantidade: number }[] }
-export interface Regra { id: string; nome: string; tipo_gatilho: 'material' | 'estrutura' | 'contexto'; material_id: string | null; estrutura_id: string | null; material_ids?: string[]; estrutura_ids?: string[]; categorias: Categoria[]; operacoes: Operacao[]; saidas: { mao_obra_id: string; quantidade: number }[] }
+export interface Regra { id: string; nome: string; tipo_gatilho: 'material' | 'estrutura' | 'contexto'; material_id: string | null; estrutura_id: string | null; material_ids?: string[]; estrutura_ids?: string[]; categorias: Categoria[]; operacoes: Operacao[]; saidas: { mao_obra_id: string; quantidade: number; operacao?: Operacao | null }[] }
 export interface Catalogos { materiais: Material[]; maoObra: MaoObra[]; estruturas: Estrutura[]; regras: Regra[] }
 export interface PranchaPdf { id: string; nome: string; pdf: Blob }
 export interface ItemMaterialPonto { material_id: string; quantidade: number }

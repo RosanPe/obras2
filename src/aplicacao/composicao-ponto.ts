@@ -62,6 +62,7 @@ export function gerarSugestoes(catalogos: Catalogos, operacao: Operacao, fontes:
     const multiplicador = quantidadeFontes + maiorCabo + avulso;
     if (!multiplicador) continue;
     for (const saida of regra.saidas) {
+      if (saida.operacao && saida.operacao !== operacao) continue;
       if (!catalogos.maoObra.some(m => m.id === saida.mao_obra_id)) throw new Error(`Mão de obra não encontrada: ${saida.mao_obra_id}`);
       if (!Number.isFinite(saida.quantidade) || saida.quantidade <= 0) throw new Error('Quantidade da regra deve ser positiva.');
       mao_obra.push({ mao_obra_id: saida.mao_obra_id, quantidade: saida.quantidade * multiplicador });

@@ -24,6 +24,22 @@ describe('composição por operação', () => {
     expect(itens.mao_obra).toContainEqual({ mao_obra_id: 'mo1', quantidade: 4 });
     expect(itens.mao_obra).toContainEqual({ mao_obra_id: 'mo2', quantidade: 9 });
   });
+  it('aplica serviços e quantidades da aba correspondente, inclusive quando o serviço se repete', () => {
+    const base: Catalogos = {
+      ...catalogos,
+      regras: [{
+        ...catalogos.regras[0],
+        saidas: [
+          { mao_obra_id: 'mo1', quantidade: 2, operacao: 'I' },
+          { mao_obra_id: 'mo2', quantidade: 3, operacao: 'D' },
+          { mao_obra_id: 'mo1', quantidade: 1, operacao: 'R' },
+        ],
+      }],
+    };
+    expect(gerarSugestoes(base, 'I', fontes).mao_obra).toEqual([{ mao_obra_id: 'mo1', quantidade: 4 }]);
+    expect(gerarSugestoes(base, 'D', fontes).mao_obra).toEqual([{ mao_obra_id: 'mo2', quantidade: 6 }]);
+    expect(gerarSugestoes(base, 'R', fontes).mao_obra).toEqual([{ mao_obra_id: 'mo1', quantidade: 2 }]);
+  });
   it('mantém dois cabos de 50 e 52 m nos materiais e usa 52 m para a mesma regra', () => {
     const itens = preencher();
     expect(itens.materiais).toContainEqual({ material_id: 'c1', quantidade: 50 });

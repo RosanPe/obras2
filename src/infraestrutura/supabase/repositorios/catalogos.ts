@@ -11,7 +11,7 @@ async function listar(tabela: string, campos = '*') {
 }
 export async function carregarCatalogos() {
   const [materiais, maoObra, estruturas, regras] = await Promise.all([
-    listar('materiais'), listar('mao_obra'), listar('estruturas', '*,itens:estrutura_itens(material_id,quantidade)'), listar('regras_mao_obra', '*,saidas:regra_saidas(mao_obra_id,quantidade),alvos:regra_alvos(material_id,estrutura_id)'),
+    listar('materiais'), listar('mao_obra'), listar('estruturas', '*,itens:estrutura_itens(material_id,quantidade)'), listar('regras_mao_obra', '*,saidas:regra_saidas(*),alvos:regra_alvos(material_id,estrutura_id)'),
   ]);
   const regraComAlvos = regraSchema.safeExtend({ alvos: z.array(z.object({ material_id: z.string().uuid().nullable(), estrutura_id: z.string().uuid().nullable() })) }).transform(({ alvos, ...regra }) => ({ ...regra, material_ids: [...new Set([regra.material_id, ...alvos.map(a => a.material_id)].filter((id): id is string => !!id))], estrutura_ids: [...new Set([regra.estrutura_id, ...alvos.map(a => a.estrutura_id)].filter((id): id is string => !!id))] }));
   return { materiais: z.array(materialSchema).parse(materiais), maoObra: z.array(maoObraSchema).parse(maoObra), estruturas: z.array(estruturaSchema).parse(estruturas), regras: z.array(regraComAlvos).parse(regras) };
@@ -43,7 +43,7 @@ export async function salvarEstrutura(entrada: Omit<Estrutura, 'id'>, id?: strin
 }
 export async function salvarRegra(entrada: Omit<Regra, 'id'>, id?: string) {
   const dados = regraFormularioSchema.parse(entrada); const cliente = await clienteAutenticado();
-  const { data, error } = await cliente.rpc('salvar_regra', { p_id: id ?? null, p_regra: dados });
+  const { data, error } = await cliente.rpc('salvar_regra_por_operacao', { p_id: id ?? null, p_regra: dados });
   if (error) throw error; return z.string().uuid().parse(data);
 }
 export type TipoCatalogo = 'materiais' | 'maoObra' | 'estruturas' | 'regras';
