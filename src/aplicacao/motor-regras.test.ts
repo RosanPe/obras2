@@ -87,6 +87,39 @@ describe('composição por operação', () => {
     expect(() => gerarSugestoes(catalogos, 'I', { ...fontes, cabos: [{ material_id: 'p', quantidade: 2 }] })).toThrow('categoria cabo');
     for (const quantidade of [0, -1, NaN, Infinity]) expect(() => gerarSugestoes(catalogos, 'I', { ...fontes, postes: [{ material_id: 'p', quantidade }] })).toThrow('Quantidade');
   });
+  describe('materiais avulsos com regra (ex.: Haste)', () => {
+    const haste: Catalogos = {
+      ...catalogos,
+      materiais: [...catalogos.materiais, { id: 'h1', codigo: '300', descricao: 'Haste terra 2,4 m', categoria: 'geral' }, { id: 'h2', codigo: '301', descricao: 'Haste terra 3 m', categoria: 'geral' }],
+      maoObra: [...catalogos.maoObra, { id: 'mo4', codigo: 'MO4', descricao: 'Cravar haste' }],
+      regras: [{ id: 'rh', nome: 'Haste', tipo_gatilho: 'material', categorias: [], material_id: 'h1', material_ids: ['h1', 'h2'], estrutura_id: null, operacoes: ['I', 'D'], saidas: [{ mao_obra_id: 'mo4', quantidade: 1, operacao: 'I' }, { mao_obra_id: 'mo4', quantidade: 0.5, operacao: 'D' }] }],
+    };
+    const vazio = { estruturas: [], postes: [], cabos: [] };
+    it('qualquer material da regra puxa a mão de obra da operação, multiplicada pela quantidade', () => {
+      const so1 = atualizarFontes(haste, 'I', composicaoVazia(), { ...vazio, avulsos: [{ material_id: 'h2', quantidade: 1 }] });
+      expect(so1.materiais).toEqual([{ material_id: 'h2', quantidade: 1 }]);
+      expect(so1.mao_obra).toEqual([{ mao_obra_id: 'mo4', quantidade: 1 }]);
+      const dois = gerarSugestoes(haste, 'I', { ...vazio, avulsos: [{ material_id: 'h1', quantidade: 2 }, { material_id: 'h2', quantidade: 1 }] });
+      expect(dois.mao_obra).toEqual([{ mao_obra_id: 'mo4', quantidade: 3 }]);
+      expect(gerarSugestoes(haste, 'D', { ...vazio, avulsos: [{ material_id: 'h1', quantidade: 2 }] }).mao_obra).toEqual([{ mao_obra_id: 'mo4', quantidade: 1 }]);
+      expect(gerarSugestoes(haste, 'R', { ...vazio, avulsos: [{ material_id: 'h1', quantidade: 2 }] })).toEqual({ materiais: [], mao_obra: [] });
+    });
+    it('mão de obra puxada é editável e a edição é preservada ao mudar a quantidade', () => {
+      const inicial = atualizarFontes(haste, 'I', composicaoVazia(), { ...vazio, avulsos: [{ material_id: 'h1', quantidade: 1 }] });
+      const editada = { ...inicial, mao_obra: [{ mao_obra_id: 'mo4', quantidade: 7 }] };
+      const nova = atualizarFontes(haste, 'I', editada, { ...vazio, avulsos: [{ material_id: 'h1', quantidade: 3 }] });
+      expect(nova.materiais).toEqual([{ material_id: 'h1', quantidade: 3 }]);
+      expect(nova.mao_obra).toEqual([{ mao_obra_id: 'mo4', quantidade: 7 }]);
+      const removida = atualizarFontes(haste, 'I', inicial, { ...vazio, avulsos: [] });
+      expect(removida).toMatchObject({ materiais: [], mao_obra: [], avulsos: [] });
+    });
+    it('o resumo usa as listas finais geradas pelos avulsos', () => {
+      const composicao = atualizarFontes(haste, 'I', composicaoVazia(), { ...vazio, avulsos: [{ material_id: 'h1', quantidade: 2 }] });
+      const resultado = calcularMedicao({ ...haste, pontos: [{ ...ponto, operacoes: { I: composicao } }] });
+      expect(resultado.materiaisInstalacao).toMatchObject([{ codigo: '300', descricao: 'Haste terra 2,4 m', unidade: 'UN', quantidade: 2 }]);
+      expect(resultado.maoObraInstalacao).toMatchObject([{ codigo: 'MO4', descricao: 'Cravar haste', unidade: 'SV', quantidade: 2 }]);
+    });
+  });
 });
 describe('resumo das listas finais', () => {
   it('lê exatamente os ajustes finais, sem reconstruir materiais ou regras', () => {

@@ -11,6 +11,8 @@ export interface ItemMaoObraPonto { mao_obra_id: string; quantidade: number }
 export interface ComposicaoOperacao {
   estruturas: { estrutura_id: string; quantidade: number }[];
   postes: ItemMaterialPonto[]; cabos: ItemMaterialPonto[];
+  /** Materiais de qualquer categoria selecionados como fonte: entram nos materiais e acionam regras de material/contexto. */
+  avulsos?: ItemMaterialPonto[];
   materiais: ItemMaterialPonto[]; mao_obra: ItemMaoObraPonto[];
   base: { materiais: ItemMaterialPonto[]; mao_obra: ItemMaoObraPonto[] };
 }

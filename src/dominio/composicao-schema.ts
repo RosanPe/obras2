@@ -4,7 +4,7 @@ const material = z.object({ material_id: z.string().min(1), quantidade });
 const servico = z.object({ mao_obra_id: z.string().min(1), quantidade });
 export const composicaoSchema = z.object({
   estruturas: z.array(z.object({ estrutura_id: z.string().min(1), quantidade })),
-  postes: z.array(material), cabos: z.array(material), materiais: z.array(material), mao_obra: z.array(servico),
+  postes: z.array(material), cabos: z.array(material), avulsos: z.array(material).optional(), materiais: z.array(material), mao_obra: z.array(servico),
   base: z.object({ materiais: z.array(material), mao_obra: z.array(servico) }),
 });
 export const pontoComposicaoSchema = z.object({

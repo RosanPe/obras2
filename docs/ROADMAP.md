@@ -141,3 +141,11 @@ Detecção automática de círculos e relatório PDF permanecem opcionais de fas
 - Workflow agora consulta a configuração do Pages com permissão de leitura e bloqueia origem legacy, mostrando o link correto para selecionar GitHub Actions.
 - A alteração administrativa de Source precisa ser feita pelo responsável no painel; o token padrão do Actions não tem permissão de administração.
 - 87 testes Vitest locais aprovados, incluindo a detecção da configuração incorreta.
+
+
+## Materiais com regra no ponto — 15/11/2026
+
+- Regras de gatilho Material só eram acionadas por estruturas, postes e cabos. Materiais de categoria geral (ex.: hastes da regra Haste) só podiam entrar pela lista final, que não aciona regras, e a mão de obra não era gerada.
+- Nova fonte **Adicionar material com regra** (`avulsos` na composição da operação): qualquer material entra na lista de materiais e aciona regras de Material/Contexto, multiplicando as saídas pela quantidade; a mão de obra gerada permanece editável e as edições manuais são preservadas.
+- A busca da lista final passou a se chamar **Incluir material na lista final (sem regra)**. Campo opcional: pontos salvos anteriormente continuam compatíveis, sem migração no Supabase.
+- 91 testes Vitest aprovados, incluindo os cenários da regra Haste para I/D/R, edição e resumo.

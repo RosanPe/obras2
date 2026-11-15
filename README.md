@@ -125,7 +125,9 @@ O número do ponto é obrigatório e não pode repetir outro ponto da obra. As q
 
 ### Seleções e listas finais
 
-Na parte superior da operação, adicione **estruturas**, **postes** e **cabos**. Cada linha permite editar a quantidade e remover a seleção. Cabos usam metros na própria linha, sem campo de metragem compartilhada.
+Na parte superior da operação, adicione **estruturas**, **postes**, **cabos** e **materiais com regra**. Cada linha permite editar a quantidade e remover a seleção. Cabos usam metros na própria linha, sem campo de metragem compartilhada.
+
+**Adicionar material com regra** aceita qualquer material do catálogo (por exemplo, hastes). O material entra na lista de materiais e aciona as regras de gatilho **Material** ou **Contexto** que o contemplam, como acontece com postes e cabos. Já **Incluir material na lista final (sem regra)** apenas acrescenta o item à lista final, sem gerar mão de obra.
 
 As seleções preenchem duas listas de conferência:
 
@@ -142,6 +144,7 @@ A busca combina código, descrição e nome, sem depender de acentos, caixa ou o
 
 - **Estrutura N1 × 2:** multiplica por 2 os materiais da composição e as quantidades de saída das regras correspondentes.
 - **Poste × 3:** gera 3 unidades do material e multiplica por 3 a saída da regra correspondente.
+- **Material com regra:** um material avulso que é alvo de uma regra de gatilho Material (ex.: regra **Haste** com dois materiais de haste) multiplica a saída da regra pela quantidade informada; vários materiais da mesma regra somam suas quantidades. A mão de obra gerada continua editável na lista final.
 - Se vários componentes da mesma estrutura correspondem à mesma regra, a estrutura contribui uma vez pela quantidade selecionada, evitando repetição por vínculos alternativos.
 - Regras podem usar material, estrutura ou contexto/categoria como gatilho e têm listas de mão de obra próprias para cada operação.
 

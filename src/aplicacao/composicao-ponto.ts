@@ -11,8 +11,10 @@ function somar<T>(itens: T[], chave: (item: T) => string, quantidade: (item: T) 
 export const somarMateriais = (itens: ItemMaterialPonto[]) => somar(itens, i => i.material_id, i => i.quantidade, (material_id, quantidade) => ({ material_id, quantidade }));
 export const somarMaoObra = (itens: ItemMaoObraPonto[]) => somar(itens, i => i.mao_obra_id, i => i.quantidade, (mao_obra_id, quantidade) => ({ mao_obra_id, quantidade }));
 
+/** Fontes que geram sugestões: estruturas, postes, cabos e materiais avulsos. */
+export type FontesOperacao = Pick<ComposicaoOperacao, 'estruturas' | 'postes' | 'cabos'> & Pick<Partial<ComposicaoOperacao>, 'avulsos'>;
 /** Sugestões são geradas apenas ao selecionar/alterar as fontes do ponto. */
-export function gerarSugestoes(catalogos: Catalogos, operacao: Operacao, fontes: Pick<ComposicaoOperacao, 'estruturas' | 'postes' | 'cabos'>, avulsosLegados: ItemMaterialPonto[] = []): ComposicaoOperacao['base'] {
+export function gerarSugestoes(catalogos: Catalogos, operacao: Operacao, fontes: FontesOperacao, avulsosLegados: ItemMaterialPonto[] = []): ComposicaoOperacao['base'] {
   const materialPorId = new Map(catalogos.materiais.map(m => [m.id, m]));
   const estruturaPorId = new Map(catalogos.estruturas.map(e => [e.id, e]));
   const materiais: ItemMaterialPonto[] = [];
@@ -39,6 +41,12 @@ export function gerarSugestoes(catalogos: Catalogos, operacao: Operacao, fontes:
       materiais.push({ ...item });
       contribuicoes.push({ material_ids: [item.material_id], quantidade: item.quantidade, cabo: categoria === 'cabo' });
     }
+  }
+  // Materiais avulsos (ex.: hastes) acionam regras de material e de contexto como postes e cabos.
+  for (const item of fontes.avulsos ?? []) {
+    conferir(item.material_id, item.quantidade);
+    materiais.push({ ...item });
+    contribuicoes.push({ material_ids: [item.material_id], quantidade: item.quantidade, cabo: materialPorId.get(item.material_id)!.categoria === 'cabo' });
   }
   for (const item of avulsosLegados) {
     conferir(item.material_id, item.quantidade); materiais.push({ ...item });
@@ -88,7 +96,7 @@ function reconciliar<T extends { quantidade: number }>(atuais: T[], anterior: T[
   }
   return resultado;
 }
-export function atualizarFontes(catalogos: Catalogos, operacao: Operacao, atual: ComposicaoOperacao, fontes: Pick<ComposicaoOperacao, 'estruturas' | 'postes' | 'cabos'>): ComposicaoOperacao {
+export function atualizarFontes(catalogos: Catalogos, operacao: Operacao, atual: ComposicaoOperacao, fontes: FontesOperacao): ComposicaoOperacao {
   const base = gerarSugestoes(catalogos, operacao, fontes);
   return { ...fontes, base,
     materiais: reconciliar(atual.materiais, atual.base.materiais, base.materiais, i => i.material_id),
