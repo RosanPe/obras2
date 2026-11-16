@@ -127,7 +127,7 @@ O número do ponto é obrigatório e não pode repetir outro ponto da obra. As q
 
 Na parte superior da operação, adicione **estruturas**, **postes**, **cabos** e **materiais com regra**. Cada linha permite editar a quantidade e remover a seleção. Cabos usam metros na própria linha, sem campo de metragem compartilhada.
 
-**Adicionar material com regra** lista apenas os materiais vinculados a alguma regra de gatilho **Material** ativa naquela operação (por exemplo, as hastes da regra Haste). O material entra na lista de materiais e aciona as regras que o contemplam, como acontece com postes e cabos. Já **Incluir material na lista final (sem regra)** lista todos os materiais do catálogo e apenas acrescenta o item à lista final, sem gerar mão de obra.
+**Adicionar material com regra** lista apenas os materiais da categoria **geral** (excluindo postes e cabos, que têm campos próprios) vinculados a alguma regra de gatilho **Material** ativa naquela operação (por exemplo, as hastes da regra Haste). O material entra na lista de materiais e aciona as regras que o contemplam, como acontece com postes e cabos. Já **Incluir material na lista final (sem regra)** lista todos os materiais do catálogo e apenas acrescenta o item à lista final, sem gerar mão de obra.
 
 As seleções preenchem duas listas de conferência:
 

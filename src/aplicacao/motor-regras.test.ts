@@ -113,12 +113,12 @@ describe('composição por operação', () => {
       const removida = atualizarFontes(haste, 'I', inicial, { ...vazio, avulsos: [] });
       expect(removida).toMatchObject({ materiais: [], mao_obra: [], avulsos: [] });
     });
-    it('lista apenas materiais contemplados por regras de material ativas na operação', () => {
+    it('lista apenas materiais da categoria geral contemplados por regras de material ativas na operação', () => {
       const comContexto: Catalogos = {
         ...haste,
         regras: [
+          ...catalogos.regras, // inclui regras de material para poste ('p') e cabos ('c1', 'c2')
           ...haste.regras,
-          { id: 'r-est', nome: 'Estrutura', tipo_gatilho: 'estrutura', categorias: [], material_id: null, estrutura_id: 'e1', operacoes: ['I'], saidas: [{ mao_obra_id: 'mo1', quantidade: 1 }] },
           { id: 'r-ctx', nome: 'Contexto', tipo_gatilho: 'contexto', categorias: ['geral'], material_id: null, estrutura_id: null, operacoes: ['I', 'R'], saidas: [{ mao_obra_id: 'mo1', quantidade: 1 }] },
         ],
       };
