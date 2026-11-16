@@ -1,4 +1,4 @@
-import type { Catalogos, ComposicaoOperacao, ItemMaterialPonto, ItemMaoObraPonto, Operacao, PontoMedicao } from '../dominio/tipos';
+import type { Catalogos, ComposicaoOperacao, ItemMaterialPonto, ItemMaoObraPonto, Material, Operacao, PontoMedicao } from '../dominio/tipos';
 export const arredondarQuantidade = (n: number) => Math.round((n + Number.EPSILON) * 1e8) / 1e8;
 export function composicaoVazia(): ComposicaoOperacao {
   return { estruturas: [], postes: [], cabos: [], materiais: [], mao_obra: [], base: { materiais: [], mao_obra: [] } };
@@ -10,6 +10,18 @@ function somar<T>(itens: T[], chave: (item: T) => string, quantidade: (item: T) 
 }
 export const somarMateriais = (itens: ItemMaterialPonto[]) => somar(itens, i => i.material_id, i => i.quantidade, (material_id, quantidade) => ({ material_id, quantidade }));
 export const somarMaoObra = (itens: ItemMaoObraPonto[]) => somar(itens, i => i.mao_obra_id, i => i.quantidade, (mao_obra_id, quantidade) => ({ mao_obra_id, quantidade }));
+
+/** Materiais vinculados a regras do tipo 'material' ativas para a operação informada. */
+export function materiaisComRegra(catalogos: Catalogos, operacao: Operacao): Material[] {
+  const ids = new Set<string>();
+  for (const regra of catalogos.regras) {
+    if (regra.tipo_gatilho !== 'material' || !regra.operacoes.includes(operacao)) continue;
+    if (!regra.saidas.some(s => !s.operacao || s.operacao === operacao)) continue;
+    if (regra.material_id) ids.add(regra.material_id);
+    for (const id of regra.material_ids ?? []) ids.add(id);
+  }
+  return catalogos.materiais.filter(m => ids.has(m.id));
+}
 
 /** Fontes que geram sugestões: estruturas, postes, cabos e materiais avulsos. */
 export type FontesOperacao = Pick<ComposicaoOperacao, 'estruturas' | 'postes' | 'cabos'> & Pick<Partial<ComposicaoOperacao>, 'avulsos'>;

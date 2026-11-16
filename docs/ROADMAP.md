@@ -146,6 +146,6 @@ Detecção automática de círculos e relatório PDF permanecem opcionais de fas
 ## Materiais com regra no ponto — 15/11/2026
 
 - Regras de gatilho Material só eram acionadas por estruturas, postes e cabos. Materiais de categoria geral (ex.: hastes da regra Haste) só podiam entrar pela lista final, que não aciona regras, e a mão de obra não era gerada.
-- Nova fonte **Adicionar material com regra** (`avulsos` na composição da operação): qualquer material entra na lista de materiais e aciona regras de Material/Contexto, multiplicando as saídas pela quantidade; a mão de obra gerada permanece editável e as edições manuais são preservadas.
+- Nova fonte **Adicionar material com regra** (`avulsos` na composição da operação): lista apenas materiais vinculados a regras de gatilho Material ativas na operação (atualizado em 16/11/2026); o material selecionado entra na lista de materiais e aciona regras de Material/Contexto, multiplicando as saídas pela quantidade. A mão de obra gerada permanece editável e as edições manuais são preservadas.
 - A busca da lista final passou a se chamar **Incluir material na lista final (sem regra)**. Campo opcional: pontos salvos anteriormente continuam compatíveis, sem migração no Supabase.
-- 91 testes Vitest aprovados, incluindo os cenários da regra Haste para I/D/R, edição e resumo.
+- 92 testes Vitest aprovados, incluindo o filtro de materiais com regra e os cenários da regra Haste para I/D/R, edição e resumo.

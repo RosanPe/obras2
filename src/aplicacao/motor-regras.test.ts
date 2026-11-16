@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { calcularMedicao } from './motor-regras';
-import { atualizarFontes, composicaoVazia, gerarSugestoes, obterOperacoesPonto } from './composicao-ponto';
+import { atualizarFontes, composicaoVazia, gerarSugestoes, materiaisComRegra, obterOperacoesPonto } from './composicao-ponto';
 import type { Catalogos, ComposicaoOperacao, PontoMedicao } from '../dominio/tipos';
 const catalogos: Catalogos = {
   materiais: [{ id: 'm', codigo: '900', descricao: 'Abraçadeira', categoria: 'geral' }, { id: 'p', codigo: '100', descricao: 'Poste', categoria: 'poste' }, { id: 'c1', codigo: '200', descricao: 'Cabo 2', categoria: 'cabo' }, { id: 'c2', codigo: '201', descricao: 'Cabo 2/0', categoria: 'cabo' }],
@@ -112,6 +112,19 @@ describe('composição por operação', () => {
       expect(nova.mao_obra).toEqual([{ mao_obra_id: 'mo4', quantidade: 7 }]);
       const removida = atualizarFontes(haste, 'I', inicial, { ...vazio, avulsos: [] });
       expect(removida).toMatchObject({ materiais: [], mao_obra: [], avulsos: [] });
+    });
+    it('lista apenas materiais contemplados por regras de material ativas na operação', () => {
+      const comContexto: Catalogos = {
+        ...haste,
+        regras: [
+          ...haste.regras,
+          { id: 'r-est', nome: 'Estrutura', tipo_gatilho: 'estrutura', categorias: [], material_id: null, estrutura_id: 'e1', operacoes: ['I'], saidas: [{ mao_obra_id: 'mo1', quantidade: 1 }] },
+          { id: 'r-ctx', nome: 'Contexto', tipo_gatilho: 'contexto', categorias: ['geral'], material_id: null, estrutura_id: null, operacoes: ['I', 'R'], saidas: [{ mao_obra_id: 'mo1', quantidade: 1 }] },
+        ],
+      };
+      expect(materiaisComRegra(comContexto, 'I').map(m => m.id)).toEqual(['h1', 'h2']);
+      expect(materiaisComRegra(comContexto, 'D').map(m => m.id)).toEqual(['h1', 'h2']);
+      expect(materiaisComRegra(comContexto, 'R')).toEqual([]);
     });
     it('o resumo usa as listas finais geradas pelos avulsos', () => {
       const composicao = atualizarFontes(haste, 'I', composicaoVazia(), { ...vazio, avulsos: [{ material_id: 'h1', quantidade: 2 }] });
